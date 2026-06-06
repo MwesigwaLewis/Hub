@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Future AI Hub — Income</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    /* ── SECTION HEADING ── */
+    .section-head {
+      padding: 14px 12px 6px;
+      font-size: 13px; font-weight: 700;
+      color: var(--cyan); letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    /* ── PURCHASED MACHINE CARD ── */
+    .owned-card {
+      margin: 0 10px 10px;
+      background: var(--surface);
+      border: 1px solid var(--border-cyan);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .owned-header {
+      display: flex; align-items: center;
+      background: #001d3322; padding: 10px 14px;
+      border-bottom: 1px solid var(--border-cyan);
+      gap: 10px;
+    }
+    .owned-name {
+      color: var(--cyan); font-size: 14px; font-weight: 700; flex: 1;
+    }
+    .owned-status {
+      font-size: 11px; font-weight: 700;
+      padding: 3px 8px; border-radius: 20px;
+    }
+    .status-running { background: #003322; color: #44ee88; border: 1px solid #33cc66; }
+    .status-expired { background: #220011; color: #ee4444; border: 1px solid #cc3333; }
+    .status-pending { background: #221100; color: #ffaa33; border: 1px solid #cc8800; }
+
+    .owned-body {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+    .owned-field {
+      padding: 10px 14px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .owned-field:nth-child(even) { border-right: none; }
+    .owned-field:nth-last-child(-n+2) { border-bottom: none; }
+    .owned-field-lbl { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+    .owned-field-val { font-size: 13px; color: #d0e8f8; font-weight: 600; }
+    .val-green { color: #44ee88; }
+    .val-cyan  { color: var(--cyan); }
+
+    /* ── INCOME / TRANSACTION RECORD ── */
+    .income-item {
+      margin: 0 10px 8px;
+      background: var(--surface);
+      border: 1px solid #0d2233;
+      border-radius: 8px; padding: 13px;
+    }
+    .income-row {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 5px; font-size: 13px;
+    }
+    .income-row:last-child { margin-bottom: 0; }
+    .income-lbl { color: #3a5a7a; }
+    .income-val { color: var(--cyan); font-weight: 600; }
+    .income-pos { color: #44ee88; font-weight: 600; }
+    .income-neg { color: #ee4444; font-weight: 600; }
+
+    /* ── FILTER TABS ── */
+    .filter-row {
+      display: flex; gap: 8px; padding: 12px 12px 4px;
+      overflow-x: auto; scrollbar-width: none;
+    }
+    .filter-row::-webkit-scrollbar { display: none; }
+    .filter-chip {
+      padding: 5px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 600;
+      background: var(--surface2); color: var(--text-muted);
+      border: 1px solid var(--border); cursor: pointer;
+      white-space: nowrap; flex-shrink: 0;
+      transition: all 0.2s;
+    }
+    .filter-chip.active { background: var(--cyan); color: #fff; border-color: var(--cyan); }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="page">
+  <div class="app-bar">
+    <span class="app-bar-title">Income</span>
+  </div>
+
+  <div class="scroll-area">
+    <!-- My Machines -->
+    <div class="section-head">My Machines</div>
+    <div id="owned-list">
+      <div class="empty-state"><div class="empty-icon">🖥️</div>No machines purchased yet</div>
+    </div>
+
+    <!-- Income Records -->
+    <div class="section-head" style="margin-top:8px">Income Records</div>
+    <div class="filter-row" id="filter-row">
+      <div class="filter-chip active" data-type="all" onclick="filterTx('all',this)">All</div>
+      <div class="filter-chip" data-type="ai_income" onclick="filterTx('ai_income',this)">AI Income</div>
+      <div class="filter-chip" data-type="deposit" onclick="filterTx('deposit',this)">Deposit</div>
+      <div class="filter-chip" data-type="withdraw" onclick="filterTx('withdraw',this)">Withdraw</div>
+      <div class="filter-chip" data-type="team" onclick="filterTx('team',this)">Team</div>
+    </div>
+    <div id="income-list">
+      <div class="empty-state"><div class="empty-icon">₿</div>No income records yet</div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav" id="bottom-nav"></nav>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/nav.js"></script>
+<script>
+  renderNav('income');
+
+  const fmt = n => parseFloat(n||0).toFixed(2);
+  let allTx = [];
+
+  async function loadOwned() {
+    try {
+      const r = await fetch('/api/my-machines');
+      const d = await r.json();
+      const box = document.getElementById('owned-list');
+      if (!d.ok || !d.machines.length) return;
+      box.innerHTML = d.machines.map(m => {
+        const statusClass = m.status === 'running' ? 'status-running' : m.status === 'expired' ? 'status-expired' : 'status-pending';
+        const statusLabel = m.status === 'running' ? 'Running' : m.status === 'expired' ? 'Expired' : 'Pending';
+        return `
+          <div class="owned-card">
+            <div class="owned-header">
+              <span class="owned-name">${m.machine_id}</span>
+              <span class="owned-status ${statusClass}">${statusLabel}</span>
+            </div>
+            <div class="owned-body">
+              <div class="owned-field">
+                <div class="owned-field-lbl">Purchase Price</div>
+                <div class="owned-field-val">${Number(m.price).toLocaleString()}.00</div>
+              </div>
+              <div class="owned-field">
+                <div class="owned-field-lbl">Lock Period</div>
+                <div class="owned-field-val">${m.lock} Days</div>
+              </div>
+              <div class="owned-field">
+                <div class="owned-field-lbl">Total Income</div>
+                <div class="owned-field-val val-cyan">${fmt(m.total_income)}</div>
+              </div>
+              <div class="owned-field">
+                <div class="owned-field-lbl">Daily Earn</div>
+                <div class="owned-field-val val-green">${fmt(m.daily_income)}</div>
+              </div>
+              <div class="owned-field">
+                <div class="owned-field-lbl">Start Date</div>
+                <div class="owned-field-val">${m.start_date || '—'}</div>
+              </div>
+              <div class="owned-field">
+                <div class="owned-field-lbl">End Date</div>
+                <div class="owned-field-val">${m.end_date || '—'}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch(e) {}
+  }
+
+  async function loadTransactions() {
+    try {
+      const r = await fetch('/api/transactions');
+      const d = await r.json();
+      if (d.ok) { allTx = d.transactions; renderTx('all'); }
+    } catch(e) {}
+  }
+
+  function filterTx(type, el) {
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    renderTx(type);
+  }
+
+  function renderTx(type) {
+    const list = document.getElementById('income-list');
+    const items = type === 'all' ? allTx : allTx.filter(t => t.type === type);
+    if (!items.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">₿</div>No records for this filter</div>';
+      return;
+    }
+    list.innerHTML = items.map(t => {
+      const cls  = parseFloat(t.amount) >= 0 ? 'income-pos' : 'income-neg';
+      const sign = parseFloat(t.amount) >= 0 ? '+' : '';
+      const dt   = (t.created_at || '').split(' ')[0];
+      return `
+        <div class="income-item">
+          <div class="income-row"><span class="income-lbl">Type</span><span class="income-val">${t.type}</span></div>
+          ${t.machine_id ? `<div class="income-row"><span class="income-lbl">Machine</span><span>${t.machine_id}</span></div>` : ''}
+          <div class="income-row"><span class="income-lbl">Amount</span><span class="${cls}">${sign}${fmt(t.amount)}</span></div>
+          <div class="income-row"><span class="income-lbl">Date</span><span style="color:#5a7a99">${dt}</span></div>
+          ${t.note ? `<div class="income-row"><span class="income-lbl">Note</span><span style="color:#3a5a6a;font-size:12px">${t.note}</span></div>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  loadOwned();
+  loadTransactions();
+</script>
+</body>
+</html>
