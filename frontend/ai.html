@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Future AI Hub — AI Machines</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    /* Series tabs are sticky below the top bar */
+    .series-tabs { top: 0; }
+
+    .buy-btn {
+      background: var(--cyan); border: none;
+      color: #fff; padding: 7px 14px;
+      border-radius: 6px; font-size: 12px;
+      font-weight: 700; cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s;
+      margin-top: 6px;
+    }
+    .buy-btn:hover { background: var(--cyan-dim); }
+
+    /* Z-series / VIP – no image on some cards, full-width info */
+    .machine-card.no-thumb .machine-thumb { display: none; }
+    .machine-card.no-thumb .machine-info { padding-left: 18px; }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="page">
+  <!-- Series tab bar (no separate app-bar — matches screenshots) -->
+  <div class="series-tabs" id="series-tabs">
+    <div class="s-tab active" data-series="All">All</div>
+    <div class="s-tab" data-series="E">E series</div>
+    <div class="s-tab" data-series="G">G series</div>
+    <div class="s-tab" data-series="A">A Series</div>
+    <div class="s-tab" data-series="Z">Z Series</div>
+    <div class="s-tab" data-series="VIP">VIP Series</div>
+  </div>
+
+  <div class="scroll-area" id="machines-list"></div>
+
+  <nav class="bottom-nav" id="bottom-nav"></nav>
+</div>
+
+<!-- BUY MODAL -->
+<div class="modal-bg" id="modal-buy">
+  <div class="modal">
+    <div class="modal-title">🤖 Purchase Machine</div>
+    <p class="modal-sub" id="buy-desc"></p>
+    <p class="modal-sub">Your balance: <span class="modal-highlight" id="buy-bal">0.00</span></p>
+    <button class="modal-btn" onclick="confirmBuy()">Confirm Purchase</button>
+    <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/nav.js"></script>
+<script>
+  renderNav('ai');
+
+  let allMachines = [];
+  let activeSeries = 'All';
+  let buyingId = null;
+  let userBalance = 0;
+
+  const fmt = n => parseFloat(n||0).toFixed(2);
+
+  // Series tab clicks
+  document.getElementById('series-tabs').addEventListener('click', e => {
+    const tab = e.target.closest('.s-tab');
+    if (!tab) return;
+    document.querySelectorAll('.s-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    activeSeries = tab.dataset.series;
+    renderMachines(activeSeries);
+  });
+
+  async function loadMachines() {
+    try {
+      const r = await fetch('/api/machines');
+      const d = await r.json();
+      if (d.ok) { allMachines = d.machines; renderMachines('All'); }
+    } catch(e) {
+      document.getElementById('machines-list').innerHTML = `<div class="empty-state"><div class="empty-icon">🤖</div>Could not load machines</div>`;
+    }
+  }
+
+  async function loadBalance() {
+    try {
+      const r = await fetch('/api/me');
+      const d = await r.json();
+      if (d.ok) userBalance = d.user.balance || 0;
+    } catch(e) {}
+  }
+
+  function renderMachines(series) {
+    const list = document.getElementById('machines-list');
+    const items = series === 'All' ? allMachines : allMachines.filter(m => m.series === series);
+
+    if (!items.length) {
+      list.innerHTML = `<div class="empty-state"><div class="empty-icon">🤖</div>No machines in this series</div>`;
+      return;
+    }
+
+    list.innerHTML = items.map(m => {
+      const hasImg = m.image_url;
+      const noThumb = !hasImg ? ' no-thumb' : '';
+      const soldClass = m.sold ? ' sold' : '';
+      return `
+        <div class="machine-card${noThumb}${soldClass}">
+          <div class="machine-thumb">
+            ${hasImg ? `<img src="${m.image_url}" alt="${m.id}" loading="lazy">` : `<span class="m-placeholder">🖥️</span>`}
+          </div>
+          <div class="machine-info">
+            <div class="machine-name">${m.id}</div>
+            <div class="machine-row">Lock: ${m.lock} Days</div>
+            <div class="machine-row">Price: ${Number(m.price).toLocaleString()}.00</div>
+            <div class="machine-row">Total income: ${Number(m.income).toLocaleString()}.00</div>
+            ${!m.sold ? `<button class="buy-btn" onclick="openBuy('${m.id}')">Buy Now</button>` : ''}
+          </div>
+          ${m.sold ? '<div class="sold-overlay">Sold out</div>' : ''}
+        </div>
+      `;
+    }).join('');
+  }
+
+  function openBuy(mid) {
+    const m = allMachines.find(x => x.id === mid);
+    if (!m) return;
+    buyingId = mid;
+    document.getElementById('buy-desc').textContent = `${m.id} — Lock: ${m.lock} days | Cost: ${Number(m.price).toLocaleString()}.00`;
+    document.getElementById('buy-bal').textContent  = fmt(userBalance);
+    document.getElementById('modal-buy').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('modal-buy').classList.remove('open');
+  }
+
+  async function confirmBuy() {
+    if (!buyingId) return;
+    try {
+      const r = await fetch('/api/machines/buy', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ machine_id: buyingId })
+      });
+      const d = await r.json();
+      closeModal();
+      if (!d.ok) { toast('❌ ' + (d.error || 'Purchase failed')); return; }
+      toast('✅ Machine purchased successfully!');
+      loadBalance();
+    } catch(e) { closeModal(); toast('❌ Connection error'); }
+  }
+
+  loadMachines();
+  loadBalance();
+</script>
+</body>
+</html>
