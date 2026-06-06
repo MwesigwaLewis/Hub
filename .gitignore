@@ -1,16 +1,6 @@
-# dependencies
-node_modules/
-
-# environment variables
 .env
-
-# database files (IMPORTANT for you)
-*.sqlite
-*.db
-
-# build output
-dist/
-build/
-
-# system files
+faihub.db
+__pycache__/
+*.pyc
+*.pyo
 .DS_Store
