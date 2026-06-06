@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Future AI Hub — Settings</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    .settings-list { padding: 0; }
+    .settings-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 18px 20px;
+      border-bottom: 1px solid #0e1e2e;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s;
+    }
+    .settings-row:hover { background: #050e1a; }
+    .settings-lbl { font-size: 15px; color: #fff; font-weight: 400; }
+    .settings-val {
+      font-size: 14px; color: #4a6a8a;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .settings-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: #1a2a3a; display: flex;
+      align-items: center; justify-content: center;
+      font-size: 20px; overflow: hidden;
+    }
+    .settings-avatar img { width:100%; height:100%; object-fit:cover; }
+    .settings-arrow { color: #2a4a6a; font-size: 18px; }
+
+    .version-row {
+      display: flex; justify-content: space-between;
+      padding: 18px 20px;
+      color: #2a4a5a; font-size: 13px;
+    }
+
+    .signout-btn {
+      display: block;
+      width: calc(100% - 32px);
+      margin: 24px 16px 16px;
+      padding: 16px;
+      background: var(--cyan); border: none;
+      border-radius: 10px; color: #fff;
+      font-size: 16px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+      transition: background 0.2s;
+    }
+    .signout-btn:hover { background: var(--cyan-dim); }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="page" style="min-height:100vh; padding-bottom:0;">
+  <div class="app-bar">
+    <a href="my.html" class="back-btn">‹</a>
+    <span class="app-bar-title">Settings</span>
+    <span style="width:40px"></span>
+  </div>
+
+  <div class="scroll-area" style="padding-bottom:20px;">
+    <div class="settings-list">
+      <div class="settings-row" onclick="document.getElementById('avatar-input').click()">
+        <span class="settings-lbl">Avatar</span>
+        <span class="settings-val">
+          <div class="settings-avatar" id="settings-avatar">👤</div>
+          <span class="settings-arrow">›</span>
+        </span>
+        <input type="file" id="avatar-input" accept="image/*" style="display:none" onchange="previewAvatar(this)">
+      </div>
+
+      <div class="settings-row" onclick="openNickModal()">
+        <span class="settings-lbl">Nick name</span>
+        <span class="settings-val">
+          <span id="settings-nick">—</span>
+          <span class="settings-arrow">›</span>
+        </span>
+      </div>
+
+      <div class="settings-row" style="cursor:default; pointer-events:none;">
+        <span class="settings-lbl">Phone Number</span>
+        <span class="settings-val" id="settings-phone">—</span>
+      </div>
+
+      <div class="settings-row" onclick="toast('Password change coming soon')">
+        <span class="settings-lbl">Modify login password</span>
+        <span class="settings-val"><span class="settings-arrow">›</span></span>
+      </div>
+
+      <div class="settings-row" onclick="toast('Bank information coming soon')">
+        <span class="settings-lbl">Bank information</span>
+        <span class="settings-val"><span class="settings-arrow">›</span></span>
+      </div>
+
+      <a href="bill.html" class="settings-row" style="text-decoration:none">
+        <span class="settings-lbl">Bill</span>
+        <span class="settings-val"><span class="settings-arrow">›</span></span>
+      </a>
+    </div>
+
+    <div class="version-row">
+      <span>Version</span>
+      <span>11.0.7</span>
+    </div>
+
+    <button class="signout-btn" onclick="doLogout()">Sign out of account</button>
+  </div>
+</div>
+
+<!-- NICK MODAL -->
+<div class="modal-bg" id="modal-nick">
+  <div class="modal">
+    <div class="modal-title">✏️ Change Nickname</div>
+    <input class="modal-input" id="nick-input" type="text" placeholder="New nickname">
+    <button class="modal-btn" onclick="saveNick()">Save</button>
+    <button class="modal-cancel" onclick="document.getElementById('modal-nick').classList.remove('open')">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/nav.js"></script>
+<script>
+  async function loadUser() {
+    try {
+      const r = await fetch('/api/me');
+      const d = await r.json();
+      if (!d.ok) { window.location.href = 'login.html'; return; }
+      const u = d.user;
+      document.getElementById('settings-nick').textContent  = u.nick || '—';
+      document.getElementById('settings-phone').textContent = u.phone || '—';
+      if (u.avatar_url) {
+        document.getElementById('settings-avatar').innerHTML = `<img src="${u.avatar_url}" alt="avatar">`;
+      }
+    } catch(e) {}
+  }
+
+  function openNickModal() {
+    document.getElementById('nick-input').value = document.getElementById('settings-nick').textContent;
+    document.getElementById('modal-nick').classList.add('open');
+  }
+
+  async function saveNick() {
+    const nick = document.getElementById('nick-input').value.trim();
+    if (!nick) { toast('Enter a nickname'); return; }
+    try {
+      const r = await fetch('/api/profile/nick', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ nick })
+      });
+      const d = await r.json();
+      document.getElementById('modal-nick').classList.remove('open');
+      if (!d.ok) { toast('❌ ' + (d.error||'Failed')); return; }
+      toast('Nickname updated!');
+      document.getElementById('settings-nick').textContent = nick;
+    } catch(e) { document.getElementById('modal-nick').classList.remove('open'); toast('❌ Connection error'); }
+  }
+
+  function previewAvatar(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    document.getElementById('settings-avatar').innerHTML = `<img src="${url}" alt="avatar">`;
+    toast('Avatar preview updated (connect API to save)');
+  }
+
+  async function doLogout() {
+    try {
+      await fetch('/api/logout', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    } catch(e) {}
+    window.location.href = 'login.html';
+  }
+
+  loadUser();
+</script>
+</body>
+</html>
