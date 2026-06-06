@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Future AI Hub — Home</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    /* ── HERO ── */
+    .hero-banner {
+      width: 100%; height: 200px;
+      background: linear-gradient(160deg, #04121e 0%, #051e30 50%, #021018 100%);
+      position: relative; overflow: hidden;
+      display: flex; align-items: flex-end;
+    }
+    .hero-img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%; object-fit: cover;
+      opacity: 0.55;
+    }
+    .hero-caption {
+      position: relative; z-index: 2;
+      padding: 8px 12px 10px;
+      font-size: 12.5px; font-weight: 600; color: var(--cyan);
+      line-height: 1.45;
+      background: linear-gradient(transparent, rgba(0,0,0,0.72));
+      width: 100%;
+    }
+
+    /* ── STATS 2×2 ── */
+    .stats-grid2 {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; padding: 12px 12px 0;
+    }
+    .stat-card {
+      background: #fff; border-radius: 8px;
+      overflow: hidden; text-align: center; padding: 14px 8px 0;
+    }
+    .stat-num { font-size: 17px; font-weight: 700; color: #000; padding-bottom: 10px; font-family: 'Exo 2', sans-serif; }
+    .stat-lbl {
+      background: var(--cyan); color: #fff;
+      font-size: 11px; padding: 5px 4px; font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    /* ── STATS 3 ── */
+    .stats-grid3 {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px; padding: 10px 12px 0;
+    }
+    .stat-card3 {
+      background: #fff; border-radius: 8px;
+      overflow: hidden; text-align: center; padding: 12px 4px 0;
+    }
+    .stat-num3 { font-size: 15px; font-weight: 700; color: #000; padding-bottom: 8px; font-family: 'Exo 2', sans-serif; }
+    .stat-lbl3 {
+      background: var(--cyan); color: #fff;
+      font-size: 10px; padding: 4px 2px; font-weight: 700;
+      letter-spacing: 0.1px;
+    }
+
+    /* ── MESSAGE PANEL ── */
+    .msg-panel {
+      margin: 12px;
+      background: #001d3311;
+      border: 1px solid var(--border-cyan);
+      border-radius: 12px; padding: 14px;
+    }
+    .msg-panel-hdr {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 16px; font-weight: 800; color: #fff; margin-bottom: 12px;
+    }
+    .msg-more { color: var(--cyan); font-size: 13px; cursor: pointer; font-weight: 600; }
+    .msg-item {
+      padding: 9px 0;
+      border-bottom: 1px solid #ffffff0a;
+      font-size: 13px; color: var(--cyan);
+      line-height: 1.4;
+    }
+    .msg-item:last-child { border-bottom: none; }
+    .msg-star { color: #ff3b3b; margin-right: 4px; }
+    .msg-item-red { color: #ff4444; }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="page">
+  <!-- APP BAR -->
+  <div class="app-bar">
+    <span class="app-bar-title">Future AI Hub</span>
+    <div class="app-bar-bell" onclick="toast('No new messages')">
+      <span class="bell-icon">🔔</span>
+      <span class="bell-label">Message</span>
+    </div>
+  </div>
+
+  <!-- SCROLL CONTENT -->
+  <div class="scroll-area">
+    <!-- Hero -->
+    <div class="hero-banner">
+      <div class="hero-caption" id="hero-caption">
+        Hut 8's Strategic Bitcoin Reserve Surpasses $1 Billion in Market Value with Purchase of $100 Million of...
+      </div>
+    </div>
+
+    <!-- Stats 2×2 -->
+    <div class="stats-grid2">
+      <div class="stat-card">
+        <div class="stat-num" id="h-deposit">—</div>
+        <div class="stat-lbl">Deposit details</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="h-withdraw">—</div>
+        <div class="stat-lbl">Withdraw details</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="h-ai-income">—</div>
+        <div class="stat-lbl">AI Income</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="h-today">—</div>
+        <div class="stat-lbl">Today's earnings</div>
+      </div>
+    </div>
+
+    <!-- Stats 3 -->
+    <div class="stats-grid3">
+      <div class="stat-card3">
+        <div class="stat-num3" id="h-invite">—</div>
+        <div class="stat-lbl3">Invite Count</div>
+      </div>
+      <div class="stat-card3">
+        <div class="stat-num3" id="h-team">—</div>
+        <div class="stat-lbl3">Team Count</div>
+      </div>
+      <div class="stat-card3">
+        <div class="stat-num3" id="h-team-income">—</div>
+        <div class="stat-lbl3">Team income</div>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="msg-panel">
+      <div class="msg-panel-hdr">
+        <span>Message</span>
+        <span class="msg-more">More</span>
+      </div>
+      <div id="messages-list">
+        <div class="msg-item msg-item-red"><span class="msg-star">★</span>New member training</div>
+        <div class="msg-item">The E-series machines are now available.</div>
+        <div class="msg-item">Welcome to Hut8.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav" id="bottom-nav"></nav>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/nav.js"></script>
+<script>
+  renderNav('home');
+
+  const fmt = n => parseFloat(n || 0).toFixed(2);
+
+  async function loadHome() {
+    try {
+      const r = await fetch('/api/me');
+      const d = await r.json();
+      if (!d.ok) { window.location.href = 'login.html'; return; }
+      const u = d.user;
+      document.getElementById('h-deposit').textContent    = fmt(u.total_deposit);
+      document.getElementById('h-withdraw').textContent   = fmt(u.total_withdraw);
+      document.getElementById('h-ai-income').textContent  = fmt(u.ai_income);
+      document.getElementById('h-today').textContent      = fmt(u.today_earnings);
+      document.getElementById('h-invite').textContent     = u.invite_count || 0;
+      document.getElementById('h-team').textContent       = u.team_count   || 0;
+      document.getElementById('h-team-income').textContent= fmt(u.team_income);
+    } catch(e) {
+      // Demo mode — leave placeholders
+    }
+  }
+
+  async function loadMessages() {
+    try {
+      const r = await fetch('/api/messages');
+      const d = await r.json();
+      if (!d.ok || !d.messages.length) return;
+      const list = document.getElementById('messages-list');
+      list.innerHTML = d.messages.map((m, i) => `
+        <div class="msg-item${i === 0 ? ' msg-item-red' : ''}">
+          ${i === 0 ? '<span class="msg-star">★</span>' : ''}${m.text}
+        </div>
+      `).join('');
+    } catch(e) {}
+  }
+
+  loadHome();
+  loadMessages();
+</script>
+</body>
+</html>
