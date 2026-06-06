@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Future AI Hub — Login</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .auth-wrap {
+      width: 100%; padding: 32px 24px;
+      display: flex; flex-direction: column; align-items: center;
+      position: relative; z-index: 2;
+    }
+    .auth-title {
+      font-size: 36px; font-weight: 800; color: #fff;
+      margin-bottom: 40px; letter-spacing: 0.5px;
+    }
+    .field-wrap {
+      width: 100%; position: relative; margin-bottom: 14px;
+    }
+    .field-icon {
+      position: absolute; left: 14px; top: 50%;
+      transform: translateY(-50%); font-size: 16px;
+      pointer-events: none; opacity: 0.6;
+    }
+    .auth-field {
+      width: 100%;
+      background: transparent;
+      border: 1.5px solid #1e3550;
+      border-radius: 8px;
+      padding: 15px 44px;
+      color: #fff; font-size: 15px;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    .auth-field::placeholder { color: #2e4a66; }
+    .auth-field:focus { border-color: var(--cyan); }
+    .eye-btn {
+      position: absolute; right: 14px; top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer; font-size: 18px; color: #3a5a7a;
+      background: none; border: none;
+    }
+    .lang-row {
+      align-self: flex-end; color: var(--cyan);
+      font-size: 14px; margin-bottom: 10px; cursor: pointer;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .auth-btn {
+      width: 100%; padding: 16px;
+      border: 1.5px solid var(--cyan);
+      border-radius: 8px; background: transparent;
+      color: var(--cyan); font-size: 18px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+      transition: background 0.2s;
+      letter-spacing: 0.5px;
+    }
+    .auth-btn:hover { background: #00aaff12; }
+    .auth-links {
+      width: 100%; display: flex;
+      justify-content: space-between; margin-top: 20px;
+    }
+    .auth-link {
+      color: var(--cyan); font-size: 13px;
+      cursor: pointer; text-decoration: none;
+    }
+    .auth-link:hover { text-decoration: underline; }
+    .panel-toggle { display: none; }
+    .panel { width: 100%; }
+    .panel.hidden { display: none; }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="auth-wrap">
+  <!-- LOGIN PANEL -->
+  <div class="panel" id="panel-login">
+    <h1 class="auth-title">Welcome</h1>
+
+    <div class="field-wrap">
+      <span class="field-icon">📱</span>
+      <input class="auth-field" id="login-phone" type="tel" placeholder="Phone Number" autocomplete="off">
+    </div>
+
+    <div class="field-wrap">
+      <span class="field-icon">🔑</span>
+      <input class="auth-field" id="login-pass" type="password" placeholder="Password">
+      <button class="eye-btn" type="button" onclick="togglePw('login-pass',this)">🙈</button>
+    </div>
+
+    <div class="lang-row">English ▾</div>
+
+    <button class="auth-btn" onclick="doLogin()">Login</button>
+
+    <div class="auth-links">
+      <span class="auth-link" onclick="showPanel('register')">‹ Register</span>
+      <span class="auth-link">Forgot your password?</span>
+    </div>
+  </div>
+
+  <!-- REGISTER PANEL -->
+  <div class="panel hidden" id="panel-register">
+    <h1 class="auth-title">Welcome</h1>
+
+    <div class="field-wrap">
+      <span class="field-icon">📱</span>
+      <input class="auth-field" id="reg-phone" type="tel" placeholder="Phone Number">
+    </div>
+    <div class="field-wrap">
+      <span class="field-icon">🔑</span>
+      <input class="auth-field" id="reg-pass" type="password" placeholder="Set Password">
+    </div>
+    <div class="field-wrap">
+      <span class="field-icon">🔑</span>
+      <input class="auth-field" id="reg-confirm" type="password" placeholder="Confirm Password">
+    </div>
+    <div class="field-wrap">
+      <span class="field-icon">🔗</span>
+      <input class="auth-field" id="reg-invite" type="text" placeholder="Invitation Code">
+    </div>
+
+    <button class="auth-btn" onclick="doRegister()">Register</button>
+    <div class="auth-links">
+      <span class="auth-link" onclick="showPanel('login')">‹ Login</span>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/nav.js"></script>
+<script>
+  function showPanel(name) {
+    document.getElementById('panel-login').classList.toggle('hidden', name !== 'login');
+    document.getElementById('panel-register').classList.toggle('hidden', name !== 'register');
+  }
+
+  function togglePw(id, btn) {
+    const inp = document.getElementById(id);
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+    btn.textContent = inp.type === 'password' ? '🙈' : '👁️';
+  }
+
+  async function doLogin() {
+    const phone = document.getElementById('login-phone').value.trim();
+    const pass  = document.getElementById('login-pass').value;
+    if (!phone || !pass) { toast('Please fill all fields'); return; }
+    try {
+      const r = await fetch('/api/login', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ phone, password: pass })
+      });
+      const d = await r.json();
+      if (d.ok) { window.location.href = 'home.html'; }
+      else { toast(d.error || 'Login failed'); }
+    } catch(e) { toast('Connection error'); }
+  }
+
+  async function doRegister() {
+    const phone    = document.getElementById('reg-phone').value.trim();
+    const pass     = document.getElementById('reg-pass').value;
+    const confirm  = document.getElementById('reg-confirm').value;
+    const invite   = document.getElementById('reg-invite').value.trim();
+    if (!phone || !pass || !confirm) { toast('Please fill all fields'); return; }
+    if (pass !== confirm) { toast('Passwords do not match'); return; }
+    try {
+      const r = await fetch('/api/register', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ phone, password: pass, invite_code: invite })
+      });
+      const d = await r.json();
+      if (d.ok) { toast('Registration successful!'); setTimeout(() => window.location.href = 'home.html', 900); }
+      else { toast(d.error || 'Registration failed'); }
+    } catch(e) { toast('Connection error'); }
+  }
+</script>
+</body>
+</html>
