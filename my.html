@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Future AI Hub — My</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    /* ── PROFILE HEADER ── */
+    .my-header {
+      background: #07101a;
+      padding: 14px 16px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .my-welcome { color: var(--cyan); font-size: 13px; font-weight: 600; letter-spacing: 0.3px; }
+    .my-profile-row { display: flex; align-items: center; gap: 14px; }
+    .my-avatar {
+      width: 58px; height: 58px; border-radius: 50%;
+      border: 2px solid var(--cyan);
+      background: #1a2a3a;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; flex-shrink: 0; overflow: hidden;
+    }
+    .my-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .my-info { flex: 1; }
+    .my-phone { font-size: 14px; color: #8aaccc; margin-bottom: 2px; font-weight: 500; }
+    .my-nick  { font-size: 13px; color: #5a7a9a; }
+    .my-vip-badge {
+      border: 1.5px solid #ccc;
+      border-radius: 5px;
+      padding: 5px 16px;
+      font-size: 13px; font-weight: 700;
+      color: #fff; white-space: nowrap;
+    }
+
+    /* ── WALLET BAR ── */
+    .wallet-bar {
+      margin: 12px;
+      background: #041220;
+      border: 1px solid var(--border-cyan);
+      border-radius: 10px; padding: 16px 20px;
+      display: flex; align-items: center;
+    }
+    .wallet-col { flex: 1; text-align: center; }
+    .wallet-lbl { font-size: 12px; color: #4a6a8a; margin-bottom: 5px; }
+    .wallet-num { font-size: 26px; font-weight: 800; color: #fff; }
+    .wallet-chevron {
+      font-size: 20px; color: var(--cyan);
+      padding-left: 10px; padding-top: 4px;
+    }
+
+    /* ── MENU GRID ── */
+    .menu-section {
+      margin: 0 12px 12px;
+      background: #041220;
+      border-radius: 12px; padding: 16px 12px;
+    }
+    .menu-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 16px 8px;
+    }
+    .menu-item {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 6px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      text-decoration: none;
+    }
+    .menu-icon {
+      width: 50px; height: 50px; border-radius: 14px;
+      background: var(--cyan);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      transition: transform 0.12s, opacity 0.12s;
+    }
+    .menu-item:active .menu-icon { transform: scale(0.9); opacity: 0.85; }
+    .menu-lbl { font-size: 11px; color: #8aaabb; text-align: center; line-height: 1.3; font-weight: 500; }
+
+    /* ── SALARY BOX ── */
+    .salary-box {
+      margin: 0 12px 12px;
+      background: #041220;
+      border-radius: 12px; padding: 16px;
+    }
+    .salary-row { display: flex; gap: 20px; margin-bottom: 14px; }
+    .salary-col { flex: 1; text-align: center; }
+    .salary-lbl { font-size: 11px; color: #4a6a8a; margin-bottom: 5px; }
+    .salary-num { font-size: 22px; font-weight: 800; color: #fff; }
+    .salary-btn {
+      width: 100%; padding: 15px;
+      background: var(--cyan); border: none;
+      border-radius: 8px; color: #fff;
+      font-size: 15px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+      transition: background 0.2s;
+    }
+    .salary-btn:hover { background: var(--cyan-dim); }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="page">
+  <div class="scroll-area">
+    <!-- Profile Header -->
+    <div class="my-header">
+      <div class="my-welcome">Welcome to Future AI hub</div>
+      <div class="my-profile-row">
+        <div class="my-avatar" id="my-avatar">👤</div>
+        <div class="my-info">
+          <div class="my-phone" id="my-phone">—</div>
+          <div class="my-nick" id="my-nick">—</div>
+        </div>
+        <div class="my-vip-badge" id="my-vip">VIP - 1</div>
+      </div>
+    </div>
+
+    <!-- Wallet -->
+    <div class="wallet-bar">
+      <div class="wallet-col">
+        <div class="wallet-lbl">Wallet</div>
+        <div class="wallet-num" id="my-wallet">0.00</div>
+      </div>
+      <div class="wallet-col">
+        <div class="wallet-lbl">Balance</div>
+        <div class="wallet-num" id="my-balance">0.00</div>
+      </div>
+      <div class="wallet-chevron">⌄</div>
+    </div>
+
+    <!-- Menu Grid -->
+    <div class="menu-section">
+      <div class="menu-grid">
+        <div class="menu-item" onclick="openDeposit()">
+          <div class="menu-icon">💳</div>
+          <span class="menu-lbl">Deposit</span>
+        </div>
+        <div class="menu-item" onclick="openWithdraw()">
+          <div class="menu-icon">💸</div>
+          <span class="menu-lbl">Withdraw</span>
+        </div>
+        <a class="menu-item" href="bill.html">
+          <div class="menu-icon">📋</div>
+          <span class="menu-lbl">Bill</span>
+        </a>
+        <div class="menu-item" onclick="copyInvite()">
+          <div class="menu-icon">🤝</div>
+          <span class="menu-lbl">Invite</span>
+        </div>
+        <div class="menu-item" onclick="toast('My Team')">
+          <div class="menu-icon">👥</div>
+          <span class="menu-lbl">My team</span>
+        </div>
+        <div class="menu-item" onclick="toast('VIP Tasks')">
+          <div class="menu-icon">⭐</div>
+          <span class="menu-lbl">VIP Task</span>
+        </div>
+        <div class="menu-item" onclick="toast('Rewards Center')">
+          <div class="menu-icon">🎁</div>
+          <span class="menu-lbl">Reward</span>
+        </div>
+        <a class="menu-item" href="raffle.html">
+          <div class="menu-icon">🎰</div>
+          <span class="menu-lbl">Raffle</span>
+        </a>
+        <div class="menu-item" onclick="toast('Download link')">
+          <div class="menu-icon">📥</div>
+          <span class="menu-lbl">Download App</span>
+        </div>
+        <div class="menu-item" onclick="toast('Contact Manager')">
+          <div class="menu-icon">🎧</div>
+          <span class="menu-lbl">Manager</span>
+        </div>
+        <a class="menu-item" href="settings.html">
+          <div class="menu-icon">⚙️</div>
+          <span class="menu-lbl">Settings</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Salary -->
+    <div class="salary-box">
+      <div class="salary-row">
+        <div class="salary-col">
+          <div class="salary-lbl">Last month's salary</div>
+          <div class="salary-num" id="last-salary">0.00</div>
+        </div>
+        <div class="salary-col">
+          <div class="salary-lbl">This month's salary</div>
+          <div class="salary-num" id="this-salary">0.00</div>
+        </div>
+      </div>
+      <button class="salary-btn" onclick="claimSalary()">Get last month's salary</button>
+    </div>
+  </div>
+
+  <nav class="bottom-nav" id="bottom-nav"></nav>
+</div>
+
+<!-- DEPOSIT MODAL -->
+<div class="modal-bg" id="modal-deposit">
+  <div class="modal">
+    <div class="modal-title">📱 Mobile Money Deposit</div>
+    <p class="modal-sub">Balance: <span class="modal-highlight" id="dep-bal">0.00</span></p>
+
+    <!-- Network selector — ONLY MTN and Airtel -->
+    <div style="display:flex;gap:10px;">
+      <label id="net-mtn" onclick="selectNetwork('mtn')" style="
+        flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+        padding:12px 8px;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px;
+        border:2px solid #1a3050;color:#8aaabb;transition:all 0.15s;user-select:none;">
+        <span style="font-size:20px;">🟡</span> MTN
+      </label>
+      <label id="net-airtel" onclick="selectNetwork('airtel')" style="
+        flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+        padding:12px 8px;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px;
+        border:2px solid #1a3050;color:#8aaabb;transition:all 0.15s;user-select:none;">
+        <span style="font-size:20px;">🔴</span> Airtel
+      </label>
+    </div>
+
+    <input class="modal-input" id="dep-phone" type="tel" placeholder="Mobile money number" autocomplete="tel">
+    <input class="modal-input" id="dep-amount" type="number" placeholder="Amount (₦)" min="100">
+    <button class="modal-btn" id="dep-pay-btn" onclick="startFlutterwaveDeposit()">Continue</button>
+    <button class="modal-cancel" onclick="closeModal('modal-deposit')">Cancel</button>
+  </div>
+</div>
+
+<!-- DEPOSIT VERIFYING OVERLAY -->
+<div class="modal-bg" id="modal-verifying">
+  <div class="modal" style="text-align:center;gap:18px;">
+    <div style="font-size:36px;">🔄</div>
+    <div class="modal-title" style="justify-content:center;">Verifying Payment…</div>
+    <p class="modal-sub">Please wait while we confirm your payment with Flutterwave. Do not close this page.</p>
+  </div>
+</div>
+
+<!-- WITHDRAW MODAL -->
+<div class="modal-bg" id="modal-withdraw">
+  <div class="modal">
+    <div class="modal-title">💸 Withdraw</div>
+    <p class="modal-sub">Available: <span class="modal-highlight" id="wdraw-bal">0.00</span></p>
+    <input class="modal-input" id="wdraw-amount" type="number" placeholder="Enter amount">
+    <button class="modal-btn" onclick="confirmWithdraw()">Confirm Withdraw</button>
+    <button class="modal-cancel" onclick="closeModal('modal-withdraw')">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/nav.js"></script>
+<script>
+  renderNav('my');
+
+  const fmt = n => parseFloat(n||0).toFixed(2);
+  let currentUser = null;
+
+  async function loadUser() {
+    try {
+      const r = await fetch('/api/me');
+      const d = await r.json();
+      if (!d.ok) { window.location.href = 'login.html'; return; }
+      currentUser = d.user;
+      const u = d.user;
+      document.getElementById('my-phone').textContent   = u.phone;
+      document.getElementById('my-nick').textContent    = u.nick || '—';
+      document.getElementById('my-vip').textContent     = 'VIP - ' + (u.vip_level || 1);
+      document.getElementById('my-wallet').textContent  = fmt(u.wallet);
+      document.getElementById('my-balance').textContent = fmt(u.balance);
+      document.getElementById('last-salary').textContent = fmt(u.last_salary);
+      document.getElementById('this-salary').textContent = fmt(u.this_salary);
+      if (u.avatar_url) {
+        document.getElementById('my-avatar').innerHTML = `<img src="${u.avatar_url}" alt="avatar">`;
+      }
+    } catch(e) {}
+  }
+
+  function openModal(id) { document.getElementById(id).classList.add('open'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+  // ── FLUTTERWAVE DEPOSIT (Mobile Money only — MTN / Airtel) ──────────────────
+  const FLW_PUBLIC_KEY = '';
+
+  let selectedNetwork = null; // 'mtn' | 'airtel'
+
+  function selectNetwork(net) {
+    selectedNetwork = net;
+    const active = 'border:2px solid var(--cyan);color:#fff;background:#071e30;';
+    const idle   = 'border:2px solid #1a3050;color:#8aaabb;background:transparent;';
+    document.getElementById('net-mtn').style.cssText    += net === 'mtn'    ? active : idle;
+    document.getElementById('net-airtel').style.cssText += net === 'airtel' ? active : idle;
+    // Pre-fill phone prefix for the selected network
+    const phone = document.getElementById('dep-phone');
+    if (!phone.value) {
+      phone.value = net === 'mtn' ? '0803' : '0802';
+    }
+    phone.focus();
+  }
+
+  function openDeposit() {
+    selectedNetwork = null;
+    // Reset network buttons
+    document.getElementById('net-mtn').style.cssText    = 'flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 8px;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px;border:2px solid #1a3050;color:#8aaabb;transition:all 0.15s;user-select:none;';
+    document.getElementById('net-airtel').style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 8px;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px;border:2px solid #1a3050;color:#8aaabb;transition:all 0.15s;user-select:none;';
+    document.getElementById('dep-bal').textContent    = fmt(currentUser ? currentUser.balance : 0);
+    document.getElementById('dep-phone').value        = currentUser ? (currentUser.phone || '') : '';
+    document.getElementById('dep-amount').value       = '';
+    const btn = document.getElementById('dep-pay-btn');
+    btn.disabled    = false;
+    btn.textContent = 'Continue';
+    openModal('modal-deposit');
+  }
+
+  function startFlutterwaveDeposit() {
+    if (!selectedNetwork) { toast('Select MTN or Airtel first'); return; }
+
+    const phone  = document.getElementById('dep-phone').value.trim();
+    const amount = parseFloat(document.getElementById('dep-amount').value);
+
+    if (!phone || phone.length < 7)  { toast('Enter a valid mobile number'); return; }
+    if (!amount || amount < 100)     { toast('Minimum deposit is ₦100');     return; }
+    if (!currentUser)                { toast('Please log in first');          return; }
+
+    const txRef = 'FAIHUB-' + Date.now() + '-' + Math.floor(Math.random() * 1e6);
+
+    const btn = document.getElementById('dep-pay-btn');
+    btn.disabled    = true;
+    btn.textContent = 'Opening…';
+
+    // Map our network name to Flutterwave's network code
+    const networkCode = selectedNetwork === 'mtn' ? 'MTN' : 'Airtel';
+
+    function launchFLW() {
+      FlutterwaveCheckout({
+        public_key:      FLW_PUBLIC_KEY,
+        tx_ref:          txRef,
+        amount:          amount,
+        currency:        'NGN',
+        // ── CRITICAL: mobilemoney ONLY — no card, no bank transfer, no USSD tabs ──
+        payment_options: 'mobilemoney',
+        customer: {
+          email:        currentUser.email || (phone.replace(/\D/g,'') + '@faihub.app'),
+          phone_number: phone,
+          name:         currentUser.nick || currentUser.phone || phone,
+        },
+        // Pre-select the network so user never has to choose again inside FLW
+        meta: {
+          network: networkCode,
+        },
+        customizations: {
+          title:       'Future AI Hub — Mobile Money',
+          description: networkCode + ' Mobile Money deposit',
+          logo:        '',
+        },
+        callback: function(data) {
+          try { document.querySelector('.flwpug_modal')?.remove(); } catch(_) {}
+          closeModal('modal-deposit');
+          openModal('modal-verifying');
+          verifyDepositWithServer(data.transaction_id, txRef, amount);
+        },
+        onclose: function() {
+          btn.disabled    = false;
+          btn.textContent = 'Continue';
+          toast('Payment cancelled');
+        },
+      });
+    }
+
+    if (typeof FlutterwaveCheckout === 'function') {
+      launchFLW();
+    } else {
+      const s = document.createElement('script');
+      s.src     = 'https://checkout.flutterwave.com/v3.js';
+      s.onload  = launchFLW;
+      s.onerror = () => {
+        toast('❌ Could not load payment gateway');
+        btn.disabled    = false;
+        btn.textContent = 'Continue';
+      };
+      document.head.appendChild(s);
+    }
+  }
+
+  async function verifyDepositWithServer(transactionId, txRef, expectedAmount) {
+    try {
+      const r = await fetch('/api/deposit/verify', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ transaction_id: transactionId, tx_ref: txRef, expected_amount: expectedAmount }),
+      });
+      const d = await r.json();
+      closeModal('modal-verifying');
+      if (d.ok) {
+        toast(`✅ ₦${fmt(d.credited_amount)} deposited successfully!`);
+        loadUser();
+      } else {
+        toast('❌ ' + (d.error || 'Payment could not be verified. Contact support.'));
+      }
+    } catch(e) {
+      closeModal('modal-verifying');
+      toast('❌ Verification error — keep your ref: ' + txRef);
+    }
+  }
+
+  function openWithdraw() {
+    document.getElementById('wdraw-bal').textContent = fmt(currentUser ? currentUser.balance : 0);
+    document.getElementById('wdraw-amount').value = '';
+    openModal('modal-withdraw');
+  }
+  async function confirmWithdraw() {
+    const amount = parseFloat(document.getElementById('wdraw-amount').value);
+    if (!amount || amount <= 0) { toast('Enter a valid amount'); return; }
+    try {
+      const r = await fetch('/api/withdraw', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({amount}) });
+      const d = await r.json();
+      closeModal('modal-withdraw');
+      if (!d.ok) { toast('❌ ' + (d.error||'Failed')); return; }
+      toast(`✅ Withdrawal of ${fmt(amount)} submitted!`);
+      loadUser();
+    } catch(e) { closeModal('modal-withdraw'); toast('❌ Connection error'); }
+  }
+
+  async function claimSalary() {
+    try {
+      const r = await fetch('/api/salary/claim', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+      const d = await r.json();
+      if (!d.ok) { toast('❌ ' + (d.error||'No salary available')); return; }
+      toast(`✅ Claimed ${fmt(d.amount)}!`);
+      loadUser();
+    } catch(e) { toast('❌ Connection error'); }
+  }
+
+  function copyInvite() {
+    if (!currentUser) return;
+    const code = currentUser.invite_code || '—';
+    navigator.clipboard.writeText(code)
+      .then(() => toast('Invite code copied: ' + code))
+      .catch(() => toast('Your invite code: ' + code));
+  }
+
+  loadUser();
+</script>
+</body>
+</html>
