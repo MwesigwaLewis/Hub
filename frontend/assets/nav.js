@@ -35,3 +35,59 @@ function toast(msg) {
   el.className = 'toast show';
   setTimeout(() => { el.className = 'toast'; }, 2900);
 }
+
+function initWaveBg() {
+  const bg = document.querySelector('.dot-bg');
+  if (!bg) return;
+  const canvas = document.createElement('canvas');
+  bg.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const SEPARATION = 32;
+  const AMOUNTX = 75;
+  const AMOUNTY = 55;
+  let count = 0;
+
+  function render() {
+    ctx.fillStyle = 'rgba(0,0,0,1)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height * 0.4;
+
+    for (let ix = 0; ix < AMOUNTX; ix++) {
+      for (let iy = 0; iy < AMOUNTY; iy++) {
+        const xPos = (ix * SEPARATION) - ((AMOUNTX * SEPARATION) / 2);
+        const zPos = (iy * SEPARATION) - ((AMOUNTY * SEPARATION) / 2);
+        const yPos = Math.sin((ix + count * 0.8) * 0.18) * 75 +
+                     Math.sin((iy + count * 0.5) * 0.22) * 65 +
+                     Math.cos((ix + iy + count) * 0.12) * 30;
+
+        const fov = 400;
+        const distance = fov / (fov + zPos + 350);
+        const projX = centerX + xPos * distance;
+        const projY = centerY + (yPos + 220) * distance;
+        const dotSize = Math.max(0.4, distance * 2.2);
+        const opacity = Math.min(1, Math.max(0.12, distance * 1.4));
+
+        ctx.beginPath();
+        ctx.arc(projX, projY, dotSize, 0, Math.PI * 2, true);
+        ctx.fillStyle = `rgba(0, 238, 255, ${opacity})`;
+        ctx.fill();
+      }
+    }
+    count += 0.075;
+    requestAnimationFrame(render);
+  }
+  render();
+}
+
+initWaveBg();
+
