@@ -37,29 +37,10 @@ html, body {
 /* ── ANIMATED DOT BACKGROUND ── */
 .dot-bg {
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background:
-    radial-gradient(ellipse at 10% 90%, #00335522 0%, transparent 60%),
-    radial-gradient(ellipse at 90% 10%, #001a3311 0%, transparent 60%),
-    var(--bg);
+  background: #000;
 }
-.dot-bg::before {
-  content: '';
-  position: absolute; inset: 0;
-  background-image: radial-gradient(circle, #00aaff14 1.1px, transparent 1.1px);
-  background-size: 26px 26px;
-  animation: floatDots 28s linear infinite;
-}
-.dot-bg::after {
-  content: '';
-  position: absolute; inset: 0;
-  background-image: radial-gradient(circle, #00aaff0b 1px, transparent 1px);
-  background-size: 16px 16px;
-  animation: floatDots 20s linear infinite reverse;
-}
-@keyframes floatDots {
-  0%   { transform: translateY(0) translateX(0); }
-  50%  { transform: translateY(-18px) translateX(8px); }
-  100% { transform: translateY(0) translateX(0); }
+.dot-bg canvas {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
 }
 
 /* ── APP BAR ── */
