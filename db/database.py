@@ -149,15 +149,9 @@ def init_db():
     if cur.fetchone()[0] == 0:
         default_machines = [
             # A Series — Entry level (short lock, low price)
-            ('A1', 'A',   500,    650,  30, ''),
-            ('A2', 'A',  1000,   1350,  30, ''),
-            ('A3', 'A',  2000,   2800,  30, ''),
-            # B Series — Beginner (medium lock)
-            ('B1', 'B',  5000,   7200,  60, ''),
-            ('B2', 'B', 10000,  15000,  60, ''),
-            # C Series — Intermediate (longer lock)
-            ('C1', 'C', 25000,  40000,  90, ''),
-            ('C2', 'C', 50000,  85000,  90, ''),
+            ('A1', 'A',   500,    650,  30, '/assets/images/A1_Machine.jpg'),
+            ('A2', 'A',  1000,   1350,  30, '/assets/images/A2_Machine.jpg'),
+            ('A3', 'A',  2000,   2800,  30, '/assets/images/A3_Machine.jpg'),
             # E Series — Advanced (high ROI, longer lock)
             ('E1', 'E',  60000,  1500000, 120, '/assets/images/E1_Machine.jpg'),
             ('E2', 'E', 180000,  4680000, 120, '/assets/images/E2_Machine.jpg'),
@@ -177,11 +171,11 @@ def init_db():
             ('Z4', 'Z',1000000, 34200000, 180, '/assets/images/Z4_Machine.jpg'),
             ('Z5', 'Z',2500000, 90000000, 180, '/assets/images/Z5_Machine.jpg'),
             # VIP Series — Exclusive (short lock, VIP only)
-            ('VIP-1',     'VIP',  20000,   40000,  20, ''),
-            ('VIP-1 PRO', 'VIP',  30000,  120000,  40, ''),
-            ('VIP-1 MAX', 'VIP', 200000, 6960000, 120, ''),
-            ('VIP-2',     'VIP',  50000,  110000,  20, ''),
-            ('VIP-2 PRO', 'VIP',  80000,  320000,  40, ''),
+            ('VIP-1',     'VIP',  20000,   40000,  20, '/assets/images/VIP_1.jpg'),
+            ('VIP-1 PRO', 'VIP',  30000,  120000,  40, '/assets/images/VIP_1.jpg'),
+            ('VIP-1 MAX', 'VIP', 200000, 6960000, 120, '/assets/images/VIP_1.jpg'),
+            ('VIP-2',     'VIP',  50000,  110000,  20, '/assets/images/VIP_2.jpg'),
+            ('VIP-2 PRO', 'VIP',  80000,  320000,  40, '/assets/images/VIP_2.jpg'),
         ]
         cur.executemany(
             "INSERT INTO machines (id, series, price, income, lock, image_url) VALUES (?,?,?,?,?,?)",
