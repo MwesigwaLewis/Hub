@@ -122,6 +122,21 @@
       text-transform: capitalize;
     }
 
+    /* Empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      color: #b0c8e0;
+    }
+    .empty-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+      opacity: 0.6;
+    }
+
     /* ════════════════════════════════════════
        MACHINE DETAIL PAGE
     ════════════════════════════════════════ */
@@ -310,7 +325,94 @@
       padding-bottom: calc(var(--nav-h) + 4px);
       -webkit-overflow-scrolling: touch;
     }
+
+    /* Modal */
+    .modal-bg {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-bg.open { display: flex; }
+    .modal {
+      background: #0d1520;
+      border: 1.5px solid #00b4ff;
+      border-radius: 16px;
+      padding: 24px;
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+    }
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 12px;
+    }
+    .modal-sub {
+      font-size: 14px;
+      color: #b0c8e0;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+    .modal-highlight {
+      color: var(--cyan);
+      font-weight: 700;
+    }
+    .modal-btn {
+      width: 100%;
+      padding: 14px;
+      margin-top: 16px;
+      border: none;
+      border-radius: 24px;
+      background: linear-gradient(90deg, #00b4ff, #0088ff);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .modal-btn:active { opacity: 0.85; }
+    .modal-cancel {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border: none;
+      background: transparent;
+      color: #888;
+      font-size: 14px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 24px;
+      font-size: 14px;
+      z-index: 200;
+      opacity: 0;
+      transition: all 0.3s ease;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
   </style>
+<base target="_blank">
 <base target="_blank">
 </head>
 <body>
@@ -320,11 +422,6 @@
 <div class="page" id="list-page">
   <div class="series-tabs" id="series-tabs">
     <div class="s-tab active" data-series="All">All</div>
-    <div class="s-tab" data-series="E">E series</div>
-    <div class="s-tab" data-series="G">G series</div>
-    <div class="s-tab" data-series="A">A Series</div>
-    <div class="s-tab" data-series="Z">Z Series</div>
-    <div class="s-tab" data-series="VIP">VIP Series</div>
   </div>
 
   <div class="scroll-area" id="machines-list"></div>
@@ -425,8 +522,45 @@
   let buyingId = null;
   let userBalance = 0;
   let currentMachine = null;
+  let availableSeries = [];
 
   const fmt = n => parseFloat(n || 0).toFixed(2);
+
+  // Compute derived fields from DB data (price, income, lock)
+  function enrichMachine(m) {
+    const price = parseFloat(m.price || 0);
+    const income = parseFloat(m.income || 0);
+    const lock = parseInt(m.lock || 30);
+    const daily = lock > 0 ? income / lock : 0;
+    const roi = price > 0 ? (income / price) * 100 : 0;
+    return {
+      ...m,
+      price,
+      income,
+      lock,
+      daily,
+      roi,
+      minQty: m.minQty || 1,
+      maxQty: m.maxQty || 3,
+      sold: !!m.sold,
+      image_url: m.image_url || ''
+    };
+  }
+
+  // ═══════ BUILD TABS DYNAMICALLY ═══════
+  function buildTabs() {
+    const tabsContainer = document.getElementById('series-tabs');
+    // Get unique series from loaded machines, sorted
+    const seriesSet = new Set(allMachines.map(m => m.series));
+    availableSeries = Array.from(seriesSet).sort();
+
+    let html = '<div class="s-tab active" data-series="All">All</div>';
+    for (const s of availableSeries) {
+      const label = s === 'VIP' ? 'VIP Series' : s + ' series';
+      html += `<div class="s-tab" data-series="${s}">${label}</div>`;
+    }
+    tabsContainer.innerHTML = html;
+  }
 
   // ═══════ SERIES TABS ═══════
   document.getElementById('series-tabs').addEventListener('click', e => {
@@ -444,13 +578,14 @@
       const r = await fetch('/api/machines');
       const d = await r.json();
       if (d.ok && d.machines && d.machines.length > 0) {
-        allMachines = d.machines;
+        allMachines = d.machines.map(enrichMachine);
       } else {
-        allMachines = getDemoMachines();
+        allMachines = getDemoMachines().map(enrichMachine);
       }
     } catch (e) {
-      allMachines = getDemoMachines();
+      allMachines = getDemoMachines().map(enrichMachine);
     }
+    buildTabs();
     renderMachines('All');
   }
 
@@ -464,37 +599,43 @@
     }
   }
 
-  // ═══════ DEMO DATA (for demonstration) ═══════
+  // ═══════ DEMO DATA (fallback) ═══════
   function getDemoMachines() {
     return [
-      // E Series
-      { id: 'E-1', series: 'E', lock: 120, price: 60000, income: 1500000, image_url: '/assets/images/E1_Machine.jpg', sold: false, daily: 12500, minQty: 1, maxQty: 3, roi: 2500 },
-      { id: 'E-2', series: 'E', lock: 120, price: 180000, income: 4680000, image_url: '/assets/images/E2_Machine.jpg', sold: false, daily: 39000, minQty: 1, maxQty: 3, roi: 2600 },
-      { id: 'E-3', series: 'E', lock: 100, price: 600000, income: 16200000, image_url: '/assets/images/E3_Machine.jpg', sold: false, daily: 162000, minQty: 1, maxQty: 3, roi: 2700 },
-      { id: 'E-4', series: 'E', lock: 100, price: 1200000, income: 34800000, image_url: '/assets/images/E4_Machine.jpg', sold: false, daily: 348000, minQty: 1, maxQty: 3, roi: 2900 },
-      { id: 'E-5', series: 'E', lock: 80, price: 3000000, income: 90000000, image_url: '/assets/images/E5_Machine.jpg', sold: false, daily: 1125000, minQty: 1, maxQty: 3, roi: 3000 },
-      // G Series
-      { id: 'G-1', series: 'G', lock: 100, price: 55000, income: 1100000, image_url: '/assets/images/G1_Machine.jpg', sold: false, daily: 11000, minQty: 1, maxQty: 3, roi: 2000 },
-      { id: 'G-2', series: 'G', lock: 100, price: 200000, income: 4400000, image_url: '/assets/images/G2_Machine.jpg', sold: false, daily: 44000, minQty: 1, maxQty: 3, roi: 2200 },
-      { id: 'G-3', series: 'G', lock: 100, price: 500000, income: 12500000, image_url: '/assets/images/G3_Machine.jpg', sold: false, daily: 125000, minQty: 1, maxQty: 3, roi: 2500 },
-      { id: 'G-4', series: 'G', lock: 95, price: 950000, income: 26600000, image_url: '/assets/images/G4_Machine.jpg', sold: false, daily: 280000, minQty: 1, maxQty: 3, roi: 2800 },
-      { id: 'G-5', series: 'G', lock: 95, price: 1800000, income: 54000000, image_url: '/assets/images/G5_Machine.jpg', sold: false, daily: 568421, minQty: 1, maxQty: 3, roi: 3000 },
       // A Series
-      { id: 'A-3', series: 'A', lock: 20, price: 2000000, income: 4200000, image_url: '/assets/images/A3_Machine.jpg', sold: true, daily: 210000, minQty: 1, maxQty: 3, roi: 210 },
-      { id: 'A-1', series: 'A', lock: 16, price: 30000, income: 48000, image_url: '/assets/images/A1_Machine.jpg', sold: false, daily: 3000, minQty: 1, maxQty: 3, roi: 160 },
-      { id: 'A-2', series: 'A', lock: 18, price: 100000, income: 198000, image_url: '/assets/images/A2_Machine.jpg', sold: false, daily: 11000, minQty: 1, maxQty: 3, roi: 198 },
+      { id: 'A1', series: 'A', lock: 30, price: 500, income: 650, image_url: '', sold: false },
+      { id: 'A2', series: 'A', lock: 30, price: 1000, income: 1350, image_url: '', sold: false },
+      { id: 'A3', series: 'A', lock: 30, price: 2000, income: 2800, image_url: '', sold: false },
+      // B Series
+      { id: 'B1', series: 'B', lock: 60, price: 5000, income: 7200, image_url: '', sold: false },
+      { id: 'B2', series: 'B', lock: 60, price: 10000, income: 15000, image_url: '', sold: false },
+      // C Series
+      { id: 'C1', series: 'C', lock: 90, price: 25000, income: 40000, image_url: '', sold: false },
+      { id: 'C2', series: 'C', lock: 90, price: 50000, income: 85000, image_url: '', sold: false },
+      // E Series
+      { id: 'E1', series: 'E', lock: 120, price: 60000, income: 1500000, image_url: '/assets/images/E1_Machine.jpg', sold: false },
+      { id: 'E2', series: 'E', lock: 120, price: 180000, income: 4680000, image_url: '/assets/images/E2_Machine.jpg', sold: false },
+      { id: 'E3', series: 'E', lock: 100, price: 600000, income: 16200000, image_url: '/assets/images/E3_Machine.jpg', sold: false },
+      { id: 'E4', series: 'E', lock: 100, price: 1200000, income: 34800000, image_url: '/assets/images/E4_Machine.jpg', sold: false },
+      { id: 'E5', series: 'E', lock: 80, price: 3000000, income: 90000000, image_url: '/assets/images/E5_Machine.jpg', sold: false },
+      // G Series
+      { id: 'G1', series: 'G', lock: 100, price: 55000, income: 1100000, image_url: '/assets/images/G1_Machine.jpg', sold: false },
+      { id: 'G2', series: 'G', lock: 100, price: 200000, income: 4400000, image_url: '/assets/images/G2_Machine.jpg', sold: false },
+      { id: 'G3', series: 'G', lock: 100, price: 500000, income: 12500000, image_url: '/assets/images/G3_Machine.jpg', sold: false },
+      { id: 'G4', series: 'G', lock: 95, price: 950000, income: 26600000, image_url: '/assets/images/G4_Machine.jpg', sold: false },
+      { id: 'G5', series: 'G', lock: 95, price: 1800000, income: 54000000, image_url: '/assets/images/G5_Machine.jpg', sold: false },
       // Z Series
-      { id: 'Z-1', series: 'Z', lock: 180, price: 60000, income: 1620000, image_url: '/assets/images/Z1_Machine.jpg', sold: false, daily: 9000, minQty: 1, maxQty: 3, roi: 2700 },
-      { id: 'Z-2', series: 'Z', lock: 180, price: 180000, income: 5310000, image_url: '/assets/images/Z2_Machine.jpg', sold: false, daily: 29500, minQty: 1, maxQty: 3, roi: 2950 },
-      { id: 'Z-3', series: 'Z', lock: 180, price: 500000, income: 16200000, image_url: '/assets/images/Z3_Machine.jpg', sold: true, daily: 90000, minQty: 1, maxQty: 3, roi: 3240 },
-      { id: 'Z-4', series: 'Z', lock: 180, price: 1000000, income: 34200000, image_url: '/assets/images/Z4_Machine.jpg', sold: true, daily: 190000, minQty: 1, maxQty: 3, roi: 3420 },
-      { id: 'Z-5', series: 'Z', lock: 180, price: 2500000, income: 90000000, image_url: '/assets/images/Z5_Machine.jpg', sold: true, daily: 500000, minQty: 1, maxQty: 3, roi: 3600 },
+      { id: 'Z1', series: 'Z', lock: 180, price: 60000, income: 1620000, image_url: '/assets/images/Z1_Machine.jpg', sold: false },
+      { id: 'Z2', series: 'Z', lock: 180, price: 180000, income: 5310000, image_url: '/assets/images/Z2_Machine.jpg', sold: false },
+      { id: 'Z3', series: 'Z', lock: 180, price: 500000, income: 16200000, image_url: '/assets/images/Z3_Machine.jpg', sold: true },
+      { id: 'Z4', series: 'Z', lock: 180, price: 1000000, income: 34200000, image_url: '/assets/images/Z4_Machine.jpg', sold: true },
+      { id: 'Z5', series: 'Z', lock: 180, price: 2500000, income: 90000000, image_url: '/assets/images/Z5_Machine.jpg', sold: true },
       // VIP Series
-      { id: 'VIP-1', series: 'VIP', lock: 20, price: 20000, income: 40000, image_url: '', sold: false, daily: 2000, minQty: 1, maxQty: 3, roi: 200 },
-      { id: 'VIP-1 PRO', series: 'VIP', lock: 40, price: 30000, income: 120000, image_url: '', sold: false, daily: 3000, minQty: 1, maxQty: 3, roi: 400 },
-      { id: 'VIP-1 MAX', series: 'VIP', lock: 120, price: 200000, income: 6960000, image_url: '', sold: false, daily: 58000, minQty: 1, maxQty: 3, roi: 3480 },
-      { id: 'VIP-2', series: 'VIP', lock: 20, price: 50000, income: 110000, image_url: '', sold: false, daily: 5500, minQty: 1, maxQty: 3, roi: 220 },
-      { id: 'VIP-2 PRO', series: 'VIP', lock: 40, price: 80000, income: 320000, image_url: '', sold: false, daily: 8000, minQty: 1, maxQty: 3, roi: 400 },
+      { id: 'VIP-1',     series: 'VIP', lock: 20,  price: 20000,  income: 40000,   image_url: '', sold: false },
+      { id: 'VIP-1 PRO', series: 'VIP', lock: 40,  price: 30000,  income: 120000,  image_url: '', sold: false },
+      { id: 'VIP-1 MAX', series: 'VIP', lock: 120, price: 200000, income: 6960000,  image_url: '', sold: false },
+      { id: 'VIP-2',     series: 'VIP', lock: 20,  price: 50000,  income: 110000,  image_url: '', sold: false },
+      { id: 'VIP-2 PRO', series: 'VIP', lock: 40,  price: 80000,  income: 320000,  image_url: '', sold: false },
     ];
   }
 
@@ -535,17 +676,19 @@
     if (!m) return;
     currentMachine = m;
 
+    const daily = m.daily;
+    const roi = m.roi;
+
     // Populate detail page
     document.getElementById('detail-name').textContent = m.id;
     document.getElementById('detail-price').textContent = `Price: ${Number(m.price).toLocaleString()}.00`;
-    document.getElementById('detail-roi').textContent = `ROI: ${fmt(m.roi || ((m.income / m.price) * 100))}%`;
+    document.getElementById('detail-roi').textContent = `ROI: ${fmt(roi)}%`;
     document.getElementById('detail-lock').textContent = `${m.lock}Days`;
-    document.getElementById('detail-daily').textContent = fmt(m.daily || (m.income / m.lock));
+    document.getElementById('detail-daily').textContent = fmt(daily);
     document.getElementById('detail-income').textContent = Number(m.income).toLocaleString() + '.00';
-    document.getElementById('detail-min').textContent = m.minQty || 1;
-    document.getElementById('detail-max').textContent = m.maxQty || 3;
+    document.getElementById('detail-min').textContent = m.minQty;
+    document.getElementById('detail-max').textContent = m.maxQty;
 
-    const daily = m.daily || (m.income / m.lock);
     const teamCalc = `${fmt(daily)}×10.00%×${m.lock}Days`;
     document.getElementById('team-lv1').textContent = teamCalc;
     document.getElementById('team-lv2').textContent = teamCalc;
@@ -622,6 +765,13 @@
       closeModal();
       toast('✅ Machine purchased successfully!');
     }
+  }
+
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
   }
 
   // ═══════ INIT ═══════
