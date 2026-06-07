@@ -148,12 +148,40 @@ def init_db():
     cur.execute("SELECT COUNT(*) FROM machines")
     if cur.fetchone()[0] == 0:
         default_machines = [
-            ('A1', 'A',  500,   650,  30),
-            ('A2', 'A', 1000,  1350,  30),
-            ('A3', 'A', 2000,  2800,  30),
-            ('B1', 'B', 5000,  7200,  60),
-            ('B2', 'B',10000, 15000,  60),
-            ('C1', 'C',25000, 40000,  90),
+            # A Series — Entry level (short lock, low price)
+            ('A1', 'A',   500,    650,  30),
+            ('A2', 'A',  1000,   1350,  30),
+            ('A3', 'A',  2000,   2800,  30),
+            # B Series — Beginner (medium lock)
+            ('B1', 'B',  5000,   7200,  60),
+            ('B2', 'B', 10000,  15000,  60),
+            # C Series — Intermediate (longer lock)
+            ('C1', 'C', 25000,  40000,  90),
+            ('C2', 'C', 50000,  85000,  90),
+            # E Series — Advanced (high ROI, longer lock)
+            ('E1', 'E',  60000,  1500000, 120),
+            ('E2', 'E', 180000,  4680000, 120),
+            ('E3', 'E', 600000, 16200000, 100),
+            ('E4', 'E',1200000, 34800000, 100),
+            ('E5', 'E',3000000, 90000000,  80),
+            # G Series — Growth (balanced)
+            ('G1', 'G',  55000,  1100000, 100),
+            ('G2', 'G', 200000,  4400000, 100),
+            ('G3', 'G', 500000, 12500000, 100),
+            ('G4', 'G', 950000, 26600000,  95),
+            ('G5', 'G',1800000, 54000000,  95),
+            # Z Series — Elite (highest ROI, longest lock)
+            ('Z1', 'Z',  60000,  1620000, 180),
+            ('Z2', 'Z', 180000,  5310000, 180),
+            ('Z3', 'Z', 500000, 16200000, 180),
+            ('Z4', 'Z',1000000, 34200000, 180),
+            ('Z5', 'Z',2500000, 90000000, 180),
+            # VIP Series — Exclusive (short lock, VIP only)
+            ('VIP-1',     'VIP',  20000,   40000,  20),
+            ('VIP-1 PRO', 'VIP',  30000,  120000,  40),
+            ('VIP-1 MAX', 'VIP', 200000, 6960000, 120),
+            ('VIP-2',     'VIP',  50000,  110000,  20),
+            ('VIP-2 PRO', 'VIP',  80000,  320000,  40),
         ]
         cur.executemany(
             "INSERT INTO machines (id, series, price, income, lock) VALUES (?,?,?,?,?)",
@@ -169,4 +197,3 @@ def init_db():
     conn.commit()
     conn.close()
     print("[DB] All tables ready.")
-
