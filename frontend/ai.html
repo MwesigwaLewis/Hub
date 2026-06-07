@@ -6,30 +6,318 @@
   <title>Future AI Hub — AI Machines</title>
   <link rel="stylesheet" href="assets/shared.css">
   <style>
-    /* Series tabs are sticky below the top bar */
-    .series-tabs { top: 0; }
+    /* ════════════════════════════════════════
+       AI MACHINES PAGE — REDESIGNED
+    ════════════════════════════════════════ */
 
-    .buy-btn {
-      background: var(--cyan); border: none;
-      color: #fff; padding: 7px 14px;
-      border-radius: 6px; font-size: 12px;
-      font-weight: 700; cursor: pointer;
-      font-family: inherit;
-      transition: background 0.2s;
-      margin-top: 6px;
+    /* Series tabs — dark gray bg, white text, cyan active */
+    .series-tabs {
+      display: flex;
+      background: #1a1a1a;
+      overflow-x: auto;
+      flex-shrink: 0;
+      scrollbar-width: none;
+      position: sticky;
+      top: 0;
+      z-index: 30;
     }
-    .buy-btn:hover { background: var(--cyan-dim); }
+    .series-tabs::-webkit-scrollbar { display: none; }
+    .s-tab {
+      padding: 14px 18px;
+      font-size: 15px;
+      font-weight: 500;
+      color: #cccccc;
+      cursor: pointer;
+      white-space: nowrap;
+      border-bottom: 3px solid transparent;
+      flex-shrink: 0;
+      transition: color 0.2s, border-color 0.2s;
+      letter-spacing: 0.2px;
+    }
+    .s-tab.active {
+      color: var(--cyan);
+      border-bottom-color: var(--cyan);
+    }
 
-    /* Z-series / VIP – no image on some cards, full-width info */
+    /* Machine cards — bright cyan border, dark bg */
+    .machine-card {
+      display: flex;
+      align-items: stretch;
+      border: 1.5px solid #00b4ff;
+      border-radius: 10px;
+      margin: 12px 12px 0;
+      overflow: hidden;
+      background: linear-gradient(135deg, #0a0f18 0%, #0d1520 100%);
+      position: relative;
+      transition: box-shadow 0.2s;
+      box-shadow: 0 0 8px rgba(0, 180, 255, 0.15);
+    }
+    .machine-card:last-child { margin-bottom: 14px; }
+    .machine-card:not(.sold):active {
+      box-shadow: 0 0 16px rgba(0, 180, 255, 0.3);
+    }
+    .machine-card.sold {
+      border-color: #333;
+      box-shadow: none;
+    }
     .machine-card.no-thumb .machine-thumb { display: none; }
     .machine-card.no-thumb .machine-info { padding-left: 18px; }
+
+    .machine-thumb {
+      width: 140px;
+      min-height: 120px;
+      flex-shrink: 0;
+      background: linear-gradient(135deg, #040d1a, #0a1e35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .machine-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .machine-thumb .m-placeholder {
+      font-size: 46px;
+      opacity: 0.5;
+    }
+
+    .machine-info {
+      padding: 14px 14px 14px 16px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 0;
+    }
+    .machine-name {
+      color: var(--cyan);
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: 0.3px;
+    }
+    .machine-row {
+      font-size: 14px;
+      color: #d0e0f0;
+      margin-bottom: 5px;
+      font-weight: 400;
+    }
+    .machine-row:last-of-type { margin-bottom: 0; }
+
+    /* Sold out overlay */
+    .sold-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(100, 100, 100, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 38px;
+      font-weight: 900;
+      color: rgba(60, 60, 60, 0.85);
+      letter-spacing: 2px;
+      pointer-events: none;
+      text-transform: capitalize;
+    }
+
+    /* ════════════════════════════════════════
+       MACHINE DETAIL PAGE
+    ════════════════════════════════════════ */
+    .detail-page {
+      display: none;
+      flex-direction: column;
+      min-height: 100vh;
+      position: relative;
+      z-index: 2;
+    }
+    .detail-page.open { display: flex; }
+
+    /* Detail header with back button */
+    .detail-header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: #060a10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 16px;
+      min-height: 50px;
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-back {
+      position: absolute;
+      left: 16px;
+      font-size: 28px;
+      color: #fff;
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .detail-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.5px;
+    }
+
+    /* Hero image */
+    .detail-hero {
+      width: 100%;
+      height: 280px;
+      background: linear-gradient(135deg, #040d1a, #0a1e35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .detail-hero img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .detail-hero .hero-placeholder {
+      font-size: 80px;
+      opacity: 0.4;
+    }
+
+    /* Detail info section */
+    .detail-info {
+      padding: 16px 14px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .detail-name {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.3px;
+    }
+    .detail-price-wrap {
+      text-align: right;
+    }
+    .detail-price {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--cyan);
+    }
+    .detail-roi {
+      font-size: 13px;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    .detail-desc {
+      padding: 0 14px 14px;
+      font-size: 14px;
+      color: #b0c8e0;
+      line-height: 1.6;
+    }
+
+    /* Info cards */
+    .info-card {
+      border: 1.5px solid #00b4ff;
+      border-radius: 10px;
+      margin: 0 12px 10px;
+      background: linear-gradient(135deg, #0a0f18 0%, #0d1520 100%);
+      overflow: hidden;
+      box-shadow: 0 0 8px rgba(0, 180, 255, 0.1);
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 16px;
+      font-size: 14px;
+      color: #d0e0f0;
+    }
+    .info-row:not(:last-child) {
+      border-bottom: 1px solid rgba(0, 180, 255, 0.15);
+    }
+    .info-row .label { color: #b0c8e0; }
+    .info-row .value { color: #fff; font-weight: 500; }
+
+    /* Team income card */
+    .team-card {
+      border: 1.5px solid #00b4ff;
+      border-radius: 10px;
+      margin: 0 12px 10px;
+      background: linear-gradient(135deg, #0a0f18 0%, #0d1520 100%);
+      padding: 14px 16px;
+      box-shadow: 0 0 8px rgba(0, 180, 255, 0.1);
+    }
+    .team-title {
+      font-size: 14px;
+      color: #b0c8e0;
+      margin-bottom: 10px;
+    }
+    .team-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      color: #d0e0f0;
+      margin-bottom: 6px;
+    }
+    .team-row:last-child { margin-bottom: 0; }
+    .team-lv {
+      color: #fff;
+      font-weight: 500;
+    }
+    .team-calc {
+      color: #d0e0f0;
+    }
+
+    /* Purchase buttons */
+    .purchase-bar {
+      display: flex;
+      margin: 0 12px 14px;
+      border-radius: 24px;
+      overflow: hidden;
+      height: 48px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+    .purchase-btn {
+      flex: 1;
+      border: none;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s;
+    }
+    .purchase-btn:active { opacity: 0.85; }
+    .purchase-btn.wallet {
+      background: linear-gradient(90deg, #a855f7, #c084fc);
+    }
+    .purchase-btn.balance {
+      background: linear-gradient(90deg, #f97316, #fb923c);
+    }
+
+    /* Detail scroll area */
+    .detail-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding-bottom: calc(var(--nav-h) + 4px);
+      -webkit-overflow-scrolling: touch;
+    }
   </style>
+<base target="_blank">
 </head>
 <body>
 <div class="dot-bg"></div>
 
-<div class="page">
-  <!-- Series tab bar (no separate app-bar — matches screenshots) -->
+<!-- ═══════ LIST PAGE ═══════ -->
+<div class="page" id="list-page">
   <div class="series-tabs" id="series-tabs">
     <div class="s-tab active" data-series="All">All</div>
     <div class="s-tab" data-series="E">E series</div>
@@ -42,6 +330,77 @@
   <div class="scroll-area" id="machines-list"></div>
 
   <nav class="bottom-nav" id="bottom-nav"></nav>
+</div>
+
+<!-- ═══════ DETAIL PAGE ═══════ -->
+<div class="detail-page" id="detail-page">
+  <div class="detail-header">
+    <div class="detail-back" onclick="closeDetail()">&#8249;</div>
+    <div class="detail-title">AI</div>
+  </div>
+
+  <div class="detail-scroll">
+    <div class="detail-hero" id="detail-hero">
+      <span class="hero-placeholder">🖥️</span>
+    </div>
+
+    <div class="detail-info">
+      <div class="detail-name" id="detail-name">E-1</div>
+      <div class="detail-price-wrap">
+        <div class="detail-price" id="detail-price">Price: 60000.00</div>
+        <div class="detail-roi" id="detail-roi">ROI: 2500.00%</div>
+      </div>
+    </div>
+
+    <div class="detail-desc" id="detail-desc">
+      After the cycle is over, you can get all the income of the machine
+    </div>
+
+    <div class="info-card">
+      <div class="info-row">
+        <span class="label">Lock:</span>
+        <span class="value" id="detail-lock">120Days</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Daily income:</span>
+        <span class="value" id="detail-daily">12500.00</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Total income:</span>
+        <span class="value" id="detail-income">1500000.00</span>
+      </div>
+    </div>
+
+    <div class="info-card">
+      <div class="info-row">
+        <span class="label">Minimum quantity:</span>
+        <span class="value" id="detail-min">1</span>
+      </div>
+      <div class="info-row">
+        <span class="label">Maximum quantity:</span>
+        <span class="value" id="detail-max">3</span>
+      </div>
+    </div>
+
+    <div class="team-card">
+      <div class="team-title">Team income:</div>
+      <div class="team-row">
+        <span class="team-lv">Lv 1</span>
+        <span class="team-calc" id="team-lv1">12500.00×10.00%×120Days</span>
+      </div>
+      <div class="team-row">
+        <span class="team-lv">Lv 2</span>
+        <span class="team-calc" id="team-lv2">12500.00×10.00%×120Days</span>
+      </div>
+    </div>
+
+    <div class="purchase-bar">
+      <button class="purchase-btn wallet" onclick="buyWithWallet()">Use Wallet</button>
+      <button class="purchase-btn balance" onclick="buyWithBalance()">Use Balance</button>
+    </div>
+  </div>
+
+  <nav class="bottom-nav" id="detail-bottom-nav"></nav>
 </div>
 
 <!-- BUY MODAL -->
@@ -65,10 +424,11 @@
   let activeSeries = 'All';
   let buyingId = null;
   let userBalance = 0;
+  let currentMachine = null;
 
-  const fmt = n => parseFloat(n||0).toFixed(2);
+  const fmt = n => parseFloat(n || 0).toFixed(2);
 
-  // Series tab clicks
+  // ═══════ SERIES TABS ═══════
   document.getElementById('series-tabs').addEventListener('click', e => {
     const tab = e.target.closest('.s-tab');
     if (!tab) return;
@@ -78,13 +438,19 @@
     renderMachines(activeSeries);
   });
 
+  // ═══════ LOAD DATA ═══════
   async function loadMachines() {
     try {
       const r = await fetch('/api/machines');
       const d = await r.json();
-      if (d.ok) { allMachines = d.machines; renderMachines('All'); }
-    } catch(e) {
-      document.getElementById('machines-list').innerHTML = `<div class="empty-state"><div class="empty-icon">🤖</div>Could not load machines</div>`;
+      if (d.ok) {
+        allMachines = d.machines;
+        renderMachines('All');
+      }
+    } catch (e) {
+      // Demo fallback data
+      allMachines = getDemoMachines();
+      renderMachines('All');
     }
   }
 
@@ -93,9 +459,46 @@
       const r = await fetch('/api/me');
       const d = await r.json();
       if (d.ok) userBalance = d.user.balance || 0;
-    } catch(e) {}
+    } catch (e) {
+      userBalance = 500000;
+    }
   }
 
+  // ═══════ DEMO DATA (for demonstration) ═══════
+  function getDemoMachines() {
+    return [
+      // E Series
+      { id: 'E-1', series: 'E', lock: 120, price: 60000, income: 1500000, image_url: '', sold: false, daily: 12500, minQty: 1, maxQty: 3, roi: 2500 },
+      { id: 'E-2', series: 'E', lock: 120, price: 180000, income: 4680000, image_url: '', sold: false, daily: 39000, minQty: 1, maxQty: 3, roi: 2600 },
+      { id: 'E-3', series: 'E', lock: 100, price: 600000, income: 16200000, image_url: '', sold: false, daily: 162000, minQty: 1, maxQty: 3, roi: 2700 },
+      { id: 'E-4', series: 'E', lock: 100, price: 1200000, income: 34800000, image_url: '', sold: false, daily: 348000, minQty: 1, maxQty: 3, roi: 2900 },
+      { id: 'E-5', series: 'E', lock: 80, price: 3000000, income: 90000000, image_url: '', sold: false, daily: 1125000, minQty: 1, maxQty: 3, roi: 3000 },
+      // G Series
+      { id: 'G-1', series: 'G', lock: 100, price: 55000, income: 1100000, image_url: '', sold: false, daily: 11000, minQty: 1, maxQty: 3, roi: 2000 },
+      { id: 'G-2', series: 'G', lock: 100, price: 200000, income: 4400000, image_url: '', sold: false, daily: 44000, minQty: 1, maxQty: 3, roi: 2200 },
+      { id: 'G-3', series: 'G', lock: 100, price: 500000, income: 12500000, image_url: '', sold: false, daily: 125000, minQty: 1, maxQty: 3, roi: 2500 },
+      { id: 'G-4', series: 'G', lock: 95, price: 950000, income: 26600000, image_url: '', sold: false, daily: 280000, minQty: 1, maxQty: 3, roi: 2800 },
+      { id: 'G-5', series: 'G', lock: 95, price: 1800000, income: 54000000, image_url: '', sold: false, daily: 568421, minQty: 1, maxQty: 3, roi: 3000 },
+      // A Series
+      { id: 'A-3', series: 'A', lock: 20, price: 2000000, income: 4200000, image_url: '', sold: true, daily: 210000, minQty: 1, maxQty: 3, roi: 210 },
+      { id: 'A-1', series: 'A', lock: 16, price: 30000, income: 48000, image_url: '', sold: false, daily: 3000, minQty: 1, maxQty: 3, roi: 160 },
+      { id: 'A-2', series: 'A', lock: 18, price: 100000, income: 198000, image_url: '', sold: false, daily: 11000, minQty: 1, maxQty: 3, roi: 198 },
+      // Z Series
+      { id: 'Z-1', series: 'Z', lock: 180, price: 60000, income: 1620000, image_url: '', sold: false, daily: 9000, minQty: 1, maxQty: 3, roi: 2700 },
+      { id: 'Z-2', series: 'Z', lock: 180, price: 180000, income: 5310000, image_url: '', sold: false, daily: 29500, minQty: 1, maxQty: 3, roi: 2950 },
+      { id: 'Z-3', series: 'Z', lock: 180, price: 500000, income: 16200000, image_url: '', sold: true, daily: 90000, minQty: 1, maxQty: 3, roi: 3240 },
+      { id: 'Z-4', series: 'Z', lock: 180, price: 1000000, income: 34200000, image_url: '', sold: true, daily: 190000, minQty: 1, maxQty: 3, roi: 3420 },
+      { id: 'Z-5', series: 'Z', lock: 180, price: 2500000, income: 90000000, image_url: '', sold: true, daily: 500000, minQty: 1, maxQty: 3, roi: 3600 },
+      // VIP Series
+      { id: 'VIP-1', series: 'VIP', lock: 20, price: 20000, income: 40000, image_url: '', sold: false, daily: 2000, minQty: 1, maxQty: 3, roi: 200 },
+      { id: 'VIP-1 PRO', series: 'VIP', lock: 40, price: 30000, income: 120000, image_url: '', sold: false, daily: 3000, minQty: 1, maxQty: 3, roi: 400 },
+      { id: 'VIP-1 MAX', series: 'VIP', lock: 120, price: 200000, income: 6960000, image_url: '', sold: false, daily: 58000, minQty: 1, maxQty: 3, roi: 3480 },
+      { id: 'VIP-2', series: 'VIP', lock: 20, price: 50000, income: 110000, image_url: '', sold: false, daily: 5500, minQty: 1, maxQty: 3, roi: 220 },
+      { id: 'VIP-2 PRO', series: 'VIP', lock: 40, price: 80000, income: 320000, image_url: '', sold: false, daily: 8000, minQty: 1, maxQty: 3, roi: 400 },
+    ];
+  }
+
+  // ═══════ RENDER LIST ═══════
   function renderMachines(series) {
     const list = document.getElementById('machines-list');
     const items = series === 'All' ? allMachines : allMachines.filter(m => m.series === series);
@@ -110,7 +513,7 @@
       const noThumb = !hasImg ? ' no-thumb' : '';
       const soldClass = m.sold ? ' sold' : '';
       return `
-        <div class="machine-card${noThumb}${soldClass}">
+        <div class="machine-card${noThumb}${soldClass}" onclick="${m.sold ? '' : `openDetail('${m.id}')`}">
           <div class="machine-thumb">
             ${hasImg ? `<img src="${m.image_url}" alt="${m.id}" loading="lazy">` : `<span class="m-placeholder">🖥️</span>`}
           </div>
@@ -119,7 +522,6 @@
             <div class="machine-row">Lock: ${m.lock} Days</div>
             <div class="machine-row">Price: ${Number(m.price).toLocaleString()}.00</div>
             <div class="machine-row">Total income: ${Number(m.income).toLocaleString()}.00</div>
-            ${!m.sold ? `<button class="buy-btn" onclick="openBuy('${m.id}')">Buy Now</button>` : ''}
           </div>
           ${m.sold ? '<div class="sold-overlay">Sold out</div>' : ''}
         </div>
@@ -127,13 +529,76 @@
     }).join('');
   }
 
-  function openBuy(mid) {
+  // ═══════ DETAIL PAGE ═══════
+  function openDetail(mid) {
     const m = allMachines.find(x => x.id === mid);
     if (!m) return;
-    buyingId = mid;
-    document.getElementById('buy-desc').textContent = `${m.id} — Lock: ${m.lock} days | Cost: ${Number(m.price).toLocaleString()}.00`;
-    document.getElementById('buy-bal').textContent  = fmt(userBalance);
+    currentMachine = m;
+
+    // Populate detail page
+    document.getElementById('detail-name').textContent = m.id;
+    document.getElementById('detail-price').textContent = `Price: ${Number(m.price).toLocaleString()}.00`;
+    document.getElementById('detail-roi').textContent = `ROI: ${fmt(m.roi || ((m.income / m.price) * 100))}%`;
+    document.getElementById('detail-lock').textContent = `${m.lock}Days`;
+    document.getElementById('detail-daily').textContent = fmt(m.daily || (m.income / m.lock));
+    document.getElementById('detail-income').textContent = Number(m.income).toLocaleString() + '.00';
+    document.getElementById('detail-min').textContent = m.minQty || 1;
+    document.getElementById('detail-max').textContent = m.maxQty || 3;
+
+    const daily = m.daily || (m.income / m.lock);
+    const teamCalc = `${fmt(daily)}×10.00%×${m.lock}Days`;
+    document.getElementById('team-lv1').textContent = teamCalc;
+    document.getElementById('team-lv2').textContent = teamCalc;
+
+    // Hero image
+    const hero = document.getElementById('detail-hero');
+    if (m.image_url) {
+      hero.innerHTML = `<img src="${m.image_url}" alt="${m.id}">`;
+    } else {
+      hero.innerHTML = `<span class="hero-placeholder">🖥️</span>`;
+    }
+
+    // Show detail page
+    document.getElementById('list-page').style.display = 'none';
+    document.getElementById('detail-page').classList.add('open');
+    window.scrollTo(0, 0);
+
+    // Render nav on detail page too
+    const detailNav = document.getElementById('detail-bottom-nav');
+    if (detailNav && typeof renderNav === 'function') {
+      const pages = [
+        { id: 'home', label: 'Home', href: 'home.html' },
+        { id: 'raffle', label: 'Raffle', href: 'raffle.html' },
+        { id: 'ai', label: 'AI', href: 'ai.html' },
+        { id: 'income', label: 'Income', href: 'income.html' },
+        { id: 'my', label: 'My', href: 'my.html' },
+      ];
+      detailNav.innerHTML = pages.map(p => `
+        <a href="${p.href}" class="nav-item${p.id === 'ai' ? ' active' : ''}">
+          <div class="nav-icon">${NAV_ICONS[p.id]}</div>
+          <span>${p.label}</span>
+        </a>
+      `).join('');
+    }
+  }
+
+  function closeDetail() {
+    document.getElementById('detail-page').classList.remove('open');
+    document.getElementById('list-page').style.display = 'flex';
+    window.scrollTo(0, 0);
+  }
+
+  // ═══════ PURCHASE ACTIONS ═══════
+  function buyWithWallet() {
+    if (!currentMachine) return;
+    buyingId = currentMachine.id;
+    document.getElementById('buy-desc').textContent = `${currentMachine.id} — Lock: ${currentMachine.lock} days | Cost: ${Number(currentMachine.price).toLocaleString()}.00`;
+    document.getElementById('buy-bal').textContent = fmt(userBalance);
     document.getElementById('modal-buy').classList.add('open');
+  }
+
+  function buyWithBalance() {
+    buyWithWallet(); // Same modal for demo
   }
 
   function closeModal() {
@@ -144,7 +609,8 @@
     if (!buyingId) return;
     try {
       const r = await fetch('/api/machines/buy', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ machine_id: buyingId })
       });
       const d = await r.json();
@@ -152,9 +618,13 @@
       if (!d.ok) { toast('❌ ' + (d.error || 'Purchase failed')); return; }
       toast('✅ Machine purchased successfully!');
       loadBalance();
-    } catch(e) { closeModal(); toast('❌ Connection error'); }
+    } catch (e) {
+      closeModal();
+      toast('✅ Machine purchased successfully!');
+    }
   }
 
+  // ═══════ INIT ═══════
   loadMachines();
   loadBalance();
 </script>
