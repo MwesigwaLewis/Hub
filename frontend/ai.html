@@ -443,15 +443,15 @@
     try {
       const r = await fetch('/api/machines');
       const d = await r.json();
-      if (d.ok) {
+      if (d.ok && d.machines && d.machines.length > 0) {
         allMachines = d.machines;
-        renderMachines('All');
+      } else {
+        allMachines = getDemoMachines();
       }
     } catch (e) {
-      // Demo fallback data
       allMachines = getDemoMachines();
-      renderMachines('All');
     }
+    renderMachines('All');
   }
 
   async function loadBalance() {
