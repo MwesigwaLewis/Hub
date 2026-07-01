@@ -1,9 +1,9 @@
 import os
-import psycopg2
-import psycopg2.extras
+import psycopg
+from psycopg.rows import dict_row
 
 # Supabase gives you this under Project Settings -> Database -> Connection string.
-# Use the "Connection pooling" URI (port 6543) in production so you don't run out
+# Use the "Transaction pooler" URI (port 6543) in production so you don't run out
 # of direct Postgres connections; the direct URI (port 5432) is fine for local dev.
 DATABASE_URL = os.environ.get('SUPABASE_DB_URL') or os.environ.get('DATABASE_URL')
 
@@ -15,7 +15,7 @@ if not DATABASE_URL:
 
 
 class _CursorWrapper:
-    """Makes a psycopg2 RealDictCursor behave like the old sqlite3.Row-based
+    """Makes a psycopg dict_row cursor behave like the old sqlite3.Row-based
     cursor the rest of the app was written against."""
     def __init__(self, cur):
         self._cur = cur
@@ -28,14 +28,14 @@ class _CursorWrapper:
 
 
 class _ConnWrapper:
-    """Wraps a psycopg2 connection so existing route code — db.execute(...),
+    """Wraps a psycopg connection so existing route code — db.execute(...),
     .fetchone()/.fetchall(), db.commit(), db.close() — keeps working unchanged.
-    Translates sqlite-style '?' placeholders to psycopg2's '%s' automatically."""
+    Translates sqlite-style '?' placeholders to psycopg's '%s' automatically."""
     def __init__(self, conn):
         self._conn = conn
 
     def execute(self, query, params=()):
-        cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur = self._conn.cursor(row_factory=dict_row)
         cur.execute(query.replace('?', '%s'), params)
         return _CursorWrapper(cur)
 
@@ -49,7 +49,7 @@ class _ConnWrapper:
 def get_db():
     """Return a Supabase/Postgres connection wrapped to match the previous
     sqlite3 interface used throughout the app (routes/*.py, middleware/auth.py)."""
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    conn = psycopg.connect(DATABASE_URL, sslmode='require')
     return _ConnWrapper(conn)
 
 
@@ -59,7 +59,7 @@ def init_db():
     Creates every table in Supabase Postgres if it doesn't already exist —
     safe to run repeatedly.
     """
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    conn = psycopg.connect(DATABASE_URL, sslmode='require')
     cur = conn.cursor()
 
     # ── Users ─────────────────────────────────────────────────────────────────
