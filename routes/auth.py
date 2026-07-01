@@ -65,7 +65,7 @@ def register():
         db.close()
 
 # ── POST /api/login ───────────────────────────────────────────────────────────
-@auth_bp.route('/login', methods=['POST'])
+@auth_bp.route('/index', methods=['POST'])
 def login():
     data     = request.get_json() or {}
     phone    = (data.get('phone') or '').strip()
