@@ -68,7 +68,7 @@ def init_db():
             id             SERIAL PRIMARY KEY,
             phone          TEXT NOT NULL UNIQUE,
             password       TEXT NOT NULL,
-            nick           TEXT,
+            nick           TEXT NOT NULL DEFAULT Anon,
             avatar_url     TEXT,
             email          TEXT,
             vip_level      INTEGER NOT NULL DEFAULT 1,
