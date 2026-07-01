@@ -1,49 +1,92 @@
-import sqlite3
 import os
+import psycopg2
+import psycopg2.extras
 
-DB_PATH = os.environ.get('DB_PATH', 'faihub.db')
+# Supabase gives you this under Project Settings -> Database -> Connection string.
+# Use the "Connection pooling" URI (port 6543) in production so you don't run out
+# of direct Postgres connections; the direct URI (port 5432) is fine for local dev.
+DATABASE_URL = os.environ.get('SUPABASE_DB_URL') or os.environ.get('DATABASE_URL')
+
+if not DATABASE_URL:
+    raise RuntimeError(
+        "No database URL found. Set SUPABASE_DB_URL (or DATABASE_URL) in your .env — "
+        "get it from your Supabase project: Settings -> Database -> Connection string."
+    )
+
+
+class _CursorWrapper:
+    """Makes a psycopg2 RealDictCursor behave like the old sqlite3.Row-based
+    cursor the rest of the app was written against."""
+    def __init__(self, cur):
+        self._cur = cur
+
+    def fetchone(self):
+        return self._cur.fetchone()
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+
+class _ConnWrapper:
+    """Wraps a psycopg2 connection so existing route code — db.execute(...),
+    .fetchone()/.fetchall(), db.commit(), db.close() — keeps working unchanged.
+    Translates sqlite-style '?' placeholders to psycopg2's '%s' automatically."""
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, query, params=()):
+        cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(query.replace('?', '%s'), params)
+        return _CursorWrapper(cur)
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
 
 def get_db():
-    """Return a database connection with row_factory set."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
+    """Return a Supabase/Postgres connection wrapped to match the previous
+    sqlite3 interface used throughout the app (routes/*.py, middleware/auth.py)."""
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    return _ConnWrapper(conn)
+
 
 def init_db():
     """
     Called once on app startup.
-    Creates every table if it doesn't already exist — safe to run repeatedly.
+    Creates every table in Supabase Postgres if it doesn't already exist —
+    safe to run repeatedly.
     """
-    conn = get_db()
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     cur = conn.cursor()
 
     # ── Users ─────────────────────────────────────────────────────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            phone       TEXT    NOT NULL UNIQUE,
-            password    TEXT    NOT NULL,
-            nick        TEXT,
-            avatar_url  TEXT,
-            email       TEXT,
-            vip_level   INTEGER NOT NULL DEFAULT 1,
-            balance     REAL    NOT NULL DEFAULT 0.0,
-            wallet      REAL    NOT NULL DEFAULT 0.0,
-            total_deposit  REAL NOT NULL DEFAULT 0.0,
-            total_withdraw REAL NOT NULL DEFAULT 0.0,
-            ai_income      REAL NOT NULL DEFAULT 0.0,
-            today_earnings REAL NOT NULL DEFAULT 0.0,
-            team_income    REAL NOT NULL DEFAULT 0.0,
+            id             SERIAL PRIMARY KEY,
+            phone          TEXT NOT NULL UNIQUE,
+            password       TEXT NOT NULL,
+            nick           TEXT,
+            avatar_url     TEXT,
+            email          TEXT,
+            vip_level      INTEGER NOT NULL DEFAULT 1,
+            balance        DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+            wallet         DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+            total_deposit  DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+            total_withdraw DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+            ai_income      DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+            today_earnings DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+            team_income    DOUBLE PRECISION NOT NULL DEFAULT 0.0,
             invite_count   INTEGER NOT NULL DEFAULT 0,
             team_count     INTEGER NOT NULL DEFAULT 0,
             invite_code    TEXT UNIQUE,
             invited_by     INTEGER REFERENCES users(id),
             raffle_ready   INTEGER NOT NULL DEFAULT 0,
-            last_salary    REAL    NOT NULL DEFAULT 0.0,
-            this_salary    REAL    NOT NULL DEFAULT 0.0,
-            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+            last_salary    DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+            this_salary    DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+            created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
@@ -52,95 +95,95 @@ def init_db():
         CREATE TABLE IF NOT EXISTS sessions (
             token      TEXT PRIMARY KEY,
             user_id    INTEGER NOT NULL REFERENCES users(id),
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
     # ── Deposit transactions (Flutterwave verified only) ──────────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS deposit_transactions (
-            id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            id                 SERIAL PRIMARY KEY,
             user_id            INTEGER NOT NULL REFERENCES users(id),
-            tx_ref             TEXT    NOT NULL UNIQUE,
-            flw_transaction_id TEXT    UNIQUE,
-            amount             REAL    NOT NULL,
+            tx_ref             TEXT NOT NULL UNIQUE,
+            flw_transaction_id TEXT UNIQUE,
+            amount             DOUBLE PRECISION NOT NULL,
             network            TEXT,
-            status             TEXT    NOT NULL DEFAULT 'pending',
-            created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
-            verified_at        DATETIME
+            status             TEXT NOT NULL DEFAULT 'pending',
+            created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            verified_at        TIMESTAMP
         )
     """)
 
     # ── Withdraw requests ─────────────────────────────────────────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS withdraw_requests (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id    INTEGER NOT NULL REFERENCES users(id),
-            amount     REAL    NOT NULL,
-            status     TEXT    NOT NULL DEFAULT 'pending',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            processed_at DATETIME
+            id           SERIAL PRIMARY KEY,
+            user_id      INTEGER NOT NULL REFERENCES users(id),
+            amount       DOUBLE PRECISION NOT NULL,
+            status       TEXT NOT NULL DEFAULT 'pending',
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            processed_at TIMESTAMP
         )
     """)
 
     # ── AI Machines catalogue ─────────────────────────────────────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS machines (
-            id          TEXT PRIMARY KEY,
-            series      TEXT    NOT NULL DEFAULT 'A',
-            price       REAL    NOT NULL,
-            income      REAL    NOT NULL,
-            lock        INTEGER NOT NULL DEFAULT 30,
-            image_url   TEXT,
-            sold        INTEGER NOT NULL DEFAULT 0
+            id        TEXT PRIMARY KEY,
+            series    TEXT NOT NULL DEFAULT 'A',
+            price     DOUBLE PRECISION NOT NULL,
+            income    DOUBLE PRECISION NOT NULL,
+            lock      INTEGER NOT NULL DEFAULT 30,
+            image_url TEXT,
+            sold      INTEGER NOT NULL DEFAULT 0
         )
     """)
 
     # ── User-owned machines ───────────────────────────────────────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_machines (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id      INTEGER NOT NULL REFERENCES users(id),
-            machine_id   TEXT    NOT NULL REFERENCES machines(id),
-            purchase_price REAL  NOT NULL,
-            daily_income REAL    NOT NULL,
-            total_income REAL    NOT NULL,
-            earned       REAL    NOT NULL DEFAULT 0.0,
-            status       TEXT    NOT NULL DEFAULT 'running',
-            bought_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-            expires_at   DATETIME
+            id              SERIAL PRIMARY KEY,
+            user_id         INTEGER NOT NULL REFERENCES users(id),
+            machine_id      TEXT NOT NULL REFERENCES machines(id),
+            purchase_price  DOUBLE PRECISION NOT NULL,
+            daily_income    DOUBLE PRECISION NOT NULL,
+            total_income    DOUBLE PRECISION NOT NULL,
+            earned          DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+            status          TEXT NOT NULL DEFAULT 'running',
+            bought_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at      TIMESTAMP
         )
     """)
 
     # ── General transactions ledger ───────────────────────────────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS transactions (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id     INTEGER NOT NULL REFERENCES users(id),
-            type        TEXT    NOT NULL,
-            amount      REAL    NOT NULL,
-            note        TEXT,
-            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+            id         SERIAL PRIMARY KEY,
+            user_id    INTEGER NOT NULL REFERENCES users(id),
+            type       TEXT NOT NULL,
+            amount     DOUBLE PRECISION NOT NULL,
+            note       TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
     # ── Raffle records ────────────────────────────────────────────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS raffle_records (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id     INTEGER NOT NULL REFERENCES users(id),
-            user_phone  TEXT    NOT NULL,
-            prize       REAL    NOT NULL,
-            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+            id         SERIAL PRIMARY KEY,
+            user_id    INTEGER NOT NULL REFERENCES users(id),
+            user_phone TEXT NOT NULL,
+            prize      DOUBLE PRECISION NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
     # ── Messages / announcements ──────────────────────────────────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS messages (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            text        TEXT    NOT NULL,
-            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+            id         SERIAL PRIMARY KEY,
+            text       TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
@@ -178,16 +221,18 @@ def init_db():
             ('VIP-2 PRO', 'VIP',  80000,  320000,  40, '/assets/images/VIP_2.jpg'),
         ]
         cur.executemany(
-            "INSERT INTO machines (id, series, price, income, lock, image_url) VALUES (?,?,?,?,?,?)",
+            "INSERT INTO machines (id, series, price, income, lock, image_url) VALUES (%s,%s,%s,%s,%s,%s)",
             default_machines
         )
 
     # ── Seed a default announcement if table is empty ─────────────────────────
     cur.execute("SELECT COUNT(*) FROM messages")
     if cur.fetchone()[0] == 0:
-        cur.execute("INSERT INTO messages (text) VALUES (?)",
+        cur.execute("INSERT INTO messages (text) VALUES (%s)",
                     ('Welcome to Future AI Hub! Deposit via MTN or Airtel Mobile Money.',))
 
     conn.commit()
+    cur.close()
     conn.close()
-    print("[DB] All tables ready.")
+    print("[DB] All tables ready (Supabase/Postgres).")
+    
