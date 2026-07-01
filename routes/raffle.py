@@ -5,7 +5,7 @@ from middleware.auth import login_required
 
 raffle_bp = Blueprint('raffle', __name__, url_prefix='/api')
 
-PRIZES = [50, 100, 200, 500, 1000]
+PRIZES = [5000, 100, 2000, 500, 1000]
 WEIGHTS = [40, 30, 20, 8, 2]          # probability weights
 
 # ── POST /api/raffle ──────────────────────────────────────────────────────────
