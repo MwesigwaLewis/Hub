@@ -29,7 +29,7 @@ app.register_blueprint(transactions_bp)
 
 # ── Serve frontend HTML files ─────────────────────────────────────────────────
 #@app.route('/')
-@app.route('/ai.html')
+@app.route('/home.html')
 def index():
     return send_from_directory('frontend', 'index.html')
 
