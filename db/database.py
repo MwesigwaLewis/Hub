@@ -196,7 +196,7 @@ def init_db():
             ('A2', 'A',  1000,   1350,  30, '/assets/images/A2_Machine.jpg'),
             ('A3', 'A',  2000,   2800,  30, '/assets/images/A3_Machine.jpg'),
             # E Series — Advanced (high ROI, longer lock)
-            ('E1', 'E',  60000,  1500000, 120, '/assets/images/E1_Machine.jpg'),
+            ('E1', 'E',  60000,  1500000, 2, '/assets/images/E1_Machine.jpg'),
             ('E2', 'E', 180000,  4680000, 120, '/assets/images/E2_Machine.jpg'),
             ('E3', 'E', 600000, 16200000, 100, '/assets/images/E3_Machine.jpg'),
             ('E4', 'E',1200000, 34800000, 100, '/assets/images/E4_Machine.jpg'),
