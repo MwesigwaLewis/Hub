@@ -22,8 +22,19 @@ def list_machines(current_user):
 def my_machines(current_user):
     db = get_db()
     try:
+        # NOTE: the frontend (income.html) expects `price`, `lock`,
+        # `start_date` and `end_date` fields. The old query only selected
+        # um.* + m.series, so those all came back undefined/NaN client-side.
+        # We alias purchase_price -> price, pull m.lock through the join,
+        # and format bought_at/expires_at as plain date strings.
         rows = db.execute("""
-            SELECT um.*, m.series
+            SELECT
+                um.id, um.user_id, um.machine_id, um.daily_income,
+                um.total_income, um.earned, um.status,
+                um.purchase_price AS price,
+                m.series, m.lock,
+                to_char(um.bought_at,  'YYYY-MM-DD') AS start_date,
+                to_char(um.expires_at, 'YYYY-MM-DD') AS end_date
             FROM user_machines um
             JOIN machines m ON m.id = um.machine_id
             WHERE um.user_id = ?
@@ -81,3 +92,4 @@ def buy_machine(current_user):
         return jsonify({'ok': True})
     finally:
         db.close()
+                   
