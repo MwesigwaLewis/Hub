@@ -13,15 +13,19 @@ def withdraw(current_user):
 
     if amount <= 0:
         return jsonify({'ok': False, 'error': 'Enter a valid amount'})
-    if amount > current_user['balance']:
-        return jsonify({'ok': False, 'error': 'Insufficient balance'})
 
     db = get_db()
     try:
-        db.execute(
-            "UPDATE users SET balance=balance-?, total_withdraw=total_withdraw+? WHERE id=?",
-            (amount, amount, current_user['id'])
+        # Balance check is part of the same atomic UPDATE (not a separate
+        # check-then-act step) so two concurrent withdrawals can't both pass
+        # and take the user's balance negative.
+        result = db.execute(
+            "UPDATE users SET balance=balance-?, total_withdraw=total_withdraw+? WHERE id=? AND balance>=?",
+            (amount, amount, current_user['id'], amount)
         )
+        if result.rowcount == 0:
+            db.rollback()
+            return jsonify({'ok': False, 'error': 'Insufficient balance'})
         db.execute(
             "INSERT INTO withdraw_requests (user_id, amount) VALUES (?,?)",
             (current_user['id'], amount)
@@ -34,3 +38,4 @@ def withdraw(current_user):
         return jsonify({'ok': True})
     finally:
         db.close()
+            
