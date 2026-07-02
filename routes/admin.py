@@ -2,6 +2,7 @@ import secrets
 from flask import Blueprint, request, jsonify, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 from db.database import get_db
+from db.vip import recompute_vip_level
 from middleware.admin_auth import admin_login_required, ADMIN_COOKIE_NAME
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
@@ -16,12 +17,12 @@ USER_EDITABLE_FIELDS = {
     'balance', 'wallet', 'total_deposit', 'total_withdraw',
     'ai_income', 'today_earnings', 'team_income',
     'invite_count', 'team_count', 'raffle_ready',
-    'last_salary', 'this_salary',
+    'last_salary', 'this_salary', 'depositing_invites',
 }
 NUMERIC_USER_FIELDS = {
     'vip_level', 'balance', 'wallet', 'total_deposit', 'total_withdraw',
     'ai_income', 'today_earnings', 'team_income', 'invite_count',
-    'team_count', 'raffle_ready', 'last_salary', 'this_salary',
+    'team_count', 'raffle_ready', 'last_salary', 'this_salary', 'depositing_invites',
 }
 
 MACHINE_EDITABLE_FIELDS = {'series', 'price', 'income', 'lock', 'image_url', 'sold'}
@@ -288,6 +289,12 @@ def admin_update_user(current_admin, user_id):
         if result.rowcount == 0:
             db.rollback()
             return jsonify({'ok': False, 'error': 'User not found'})
+
+        # Keep vip_level consistent with depositing_invites unless the
+        # manager explicitly overrode vip_level in this same request.
+        if 'depositing_invites' in updates and 'vip_level' not in updates:
+            recompute_vip_level(db, user_id)
+
         db.commit()
         return jsonify({'ok': True})
     finally:
@@ -692,8 +699,116 @@ def admin_delete_announcement(current_admin, msg_id):
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# CHAT INBOX
+# REWARD CODES — manager-created, redeemable by any number of different
+# users (once each), only within the validity window set at creation.
 # ══════════════════════════════════════════════════════════════════════════
+
+@admin_bp.route('/reward-codes', methods=['GET'])
+@admin_login_required
+def admin_list_reward_codes(current_admin):
+    db = get_db()
+    try:
+        rows = db.execute("""
+            SELECT rc.*, COUNT(rr.id) AS redemption_count
+            FROM reward_codes rc
+            LEFT JOIN reward_redemptions rr ON rr.code_id = rc.id
+            GROUP BY rc.id
+            ORDER BY rc.created_at DESC
+        """).fetchall()
+        for r in rows:
+            r['valid_from']  = r['valid_from'].strftime('%Y-%m-%dT%H:%M') if r['valid_from'] else None
+            r['valid_until'] = r['valid_until'].strftime('%Y-%m-%dT%H:%M') if r['valid_until'] else None
+            r['created_at']  = r['created_at'].strftime('%Y-%m-%d %H:%M') if r['created_at'] else None
+        return jsonify({'ok': True, 'reward_codes': rows})
+    finally:
+        db.close()
+
+@admin_bp.route('/reward-codes', methods=['POST'])
+@admin_login_required
+def admin_create_reward_code(current_admin):
+    import secrets as _secrets
+    data = request.get_json() or {}
+    code = (data.get('code') or '').strip().upper() or _secrets.token_hex(4).upper()
+
+    try:
+        amount = float(data.get('amount'))
+    except (TypeError, ValueError):
+        return jsonify({'ok': False, 'error': 'Enter a valid reward amount'})
+    if amount <= 0:
+        return jsonify({'ok': False, 'error': 'Amount must be greater than zero'})
+
+    valid_from  = data.get('valid_from')
+    valid_until = data.get('valid_until')
+    if not valid_from or not valid_until:
+        return jsonify({'ok': False, 'error': 'Set both a start and end time for this code'})
+
+    db = get_db()
+    try:
+        try:
+            db.execute("""
+                INSERT INTO reward_codes (code, amount, description, valid_from, valid_until, created_by)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (code, amount, (data.get('description') or '').strip(), valid_from, valid_until, current_admin['id']))
+        except Exception:
+            db.rollback()
+            return jsonify({'ok': False, 'error': f'Code "{code}" already exists — try another'})
+        db.commit()
+        return jsonify({'ok': True, 'code': code})
+    finally:
+        db.close()
+
+@admin_bp.route('/reward-codes/<int:code_id>', methods=['PATCH'])
+@admin_login_required
+def admin_update_reward_code(current_admin, code_id):
+    data = request.get_json() or {}
+    fields = {}
+    if 'amount' in data:
+        try:
+            fields['amount'] = float(data['amount'])
+        except (TypeError, ValueError):
+            return jsonify({'ok': False, 'error': 'Amount must be a number'})
+    if 'description' in data:
+        fields['description'] = (data.get('description') or '').strip()
+    if 'valid_from' in data:
+        fields['valid_from'] = data['valid_from']
+    if 'valid_until' in data:
+        fields['valid_until'] = data['valid_until']
+    if 'active' in data:
+        fields['active'] = bool(data['active'])
+
+    if not fields:
+        return jsonify({'ok': False, 'error': 'No fields to update'})
+
+    set_clause = ', '.join(f"{k}=?" for k in fields)
+    params = list(fields.values()) + [code_id]
+
+    db = get_db()
+    try:
+        result = db.execute(f"UPDATE reward_codes SET {set_clause} WHERE id=?", tuple(params))
+        if result.rowcount == 0:
+            db.rollback()
+            return jsonify({'ok': False, 'error': 'Reward code not found'})
+        db.commit()
+        return jsonify({'ok': True})
+    finally:
+        db.close()
+
+@admin_bp.route('/reward-codes/<int:code_id>', methods=['DELETE'])
+@admin_login_required
+def admin_delete_reward_code(current_admin, code_id):
+    db = get_db()
+    try:
+        db.execute("DELETE FROM reward_redemptions WHERE code_id=?", (code_id,))
+        result = db.execute("DELETE FROM reward_codes WHERE id=?", (code_id,))
+        if result.rowcount == 0:
+            db.rollback()
+            return jsonify({'ok': False, 'error': 'Reward code not found'})
+        db.commit()
+        return jsonify({'ok': True})
+    finally:
+        db.close()
+
+
 
 @admin_bp.route('/chat/conversations', methods=['GET'])
 @admin_login_required
