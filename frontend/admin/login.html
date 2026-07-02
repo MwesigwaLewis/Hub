@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Future AI Hub — Manager Login</title>
+  <link rel="stylesheet" href="../assets/shared.css">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .login-card {
+      width: 100%; max-width: 340px; margin: 0 20px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 28px 22px;
+    }
+    .login-title { font-size: 20px; font-weight: 800; color: #fff; margin-bottom: 2px; }
+    .login-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 22px; }
+    .login-field { margin-bottom: 14px; }
+    .login-field label { display: block; font-size: 12px; color: #8aaabb; margin-bottom: 6px; }
+    .login-field input {
+      width: 100%; padding: 11px 13px; border-radius: 10px;
+      background: #041220; border: 1px solid var(--border); color: #fff;
+      font-size: 14px; box-sizing: border-box;
+    }
+    .login-field input:focus { outline: none; border-color: var(--cyan); }
+    .login-btn {
+      width: 100%; padding: 12px; border: none; border-radius: 10px;
+      background: var(--cyan); color: #04121c; font-weight: 700; font-size: 14px;
+      margin-top: 6px; cursor: pointer;
+    }
+    .login-btn:disabled { opacity: 0.6; }
+    .login-error {
+      color: #ff5566; font-size: 12px; margin-top: 10px; min-height: 14px; text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="login-card">
+  <div class="login-title">Manager Login</div>
+  <div class="login-sub">Future AI Hub — back office</div>
+
+  <div class="login-field">
+    <label>Username</label>
+    <input type="text" id="username" autocomplete="username">
+  </div>
+  <div class="login-field">
+    <label>Password</label>
+    <input type="password" id="password" autocomplete="current-password">
+  </div>
+  <button class="login-btn" id="login-btn">Log In</button>
+  <div class="login-error" id="login-error"></div>
+</div>
+
+<script>
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+
+  async function doLogin() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    if (!username || !password) {
+      errEl.textContent = 'Enter username and password';
+      return;
+    }
+    btn.disabled = true;
+    errEl.textContent = '';
+    try {
+      const r = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const d = await r.json();
+      if (!d.ok) {
+        errEl.textContent = d.error || 'Login failed';
+        btn.disabled = false;
+        return;
+      }
+      window.location.href = 'dashboard.html';
+    } catch (e) {
+      errEl.textContent = 'Network error — try again';
+      btn.disabled = false;
+    }
+  }
+
+  btn.addEventListener('click', doLogin);
+  document.getElementById('password').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doLogin();
+  });
+
+  // Already logged in? skip straight to the dashboard.
+  fetch('/api/admin/me').then(r => r.json()).then(d => {
+    if (d.ok) window.location.href = 'dashboard.html';
+  }).catch(() => {});
+</script>
+</body>
+  </html>
+  
