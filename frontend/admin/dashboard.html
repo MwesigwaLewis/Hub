@@ -91,6 +91,7 @@
 <body>
 <div class="dot-bg"></div>
 
+<div class="page">
 <div class="admin-bar">
   <div class="admin-title">Manager Dashboard</div>
   <div class="admin-logout" id="logout-btn">Log out</div>
@@ -121,8 +122,9 @@
   <div class="search-bar"><input id="user-search" placeholder="Search phone or nickname…"></div>
   <div id="user-list"><div class="empty-state">Loading…</div></div>
 </div>
+</div>
 
-<!-- Chat thread overlay -->
+<!-- Chat thread overlay (its own position:fixed layer, sits above .page regardless) -->
 <div class="thread-overlay" id="thread-overlay">
   <div class="admin-bar">
     <div class="admin-title" id="thread-title">Chat</div>
