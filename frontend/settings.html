@@ -74,7 +74,7 @@
       <div class="settings-row" onclick="openNickModal()">
         <span class="settings-lbl">Nick name</span>
         <span class="settings-val">
-          <span id="settings-nick">Anon</span>
+          <span id="settings-nick">—</span>
           <span class="settings-arrow">›</span>
         </span>
       </div>
@@ -127,7 +127,7 @@
     try {
       const r = await fetch('/api/me');
       const d = await r.json();
-      if (!d.ok) { window.location.href = 'login.html'; return; }
+      if (!d.ok) { window.location.href = 'index.html'; return; }
       const u = d.user;
       document.getElementById('settings-nick').textContent  = u.nick || '—';
       document.getElementById('settings-phone').textContent = u.phone || '—';
@@ -170,7 +170,7 @@
     try {
       await fetch('/api/logout', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
     } catch(e) {}
-    window.location.href = 'login.html';
+    window.location.href = 'index.html';
   }
 
   loadUser();
