@@ -10,6 +10,7 @@ from routes.raffle import raffle_bp
 from routes.transactions import transactions_bp
 from routes.chat import chat_bp
 from routes.admin import admin_bp
+from routes.rewards import rewards_bp
 
 # ── App factory ──────────────────────────────────────────────────────────────
 app = Flask(__name__, static_folder='frontend', static_url_path='')
@@ -30,6 +31,7 @@ app.register_blueprint(raffle_bp)
 app.register_blueprint(transactions_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(rewards_bp)
 
 # ── Serve frontend HTML files ─────────────────────────────────────────────────
 @app.route('/')
