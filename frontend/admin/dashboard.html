@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Future AI Hub — Manager Dashboard</title>
+  <link rel="stylesheet" href="../assets/shared.css">
+  <style>
+    body { min-height: 100vh; }
+    .admin-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: var(--bg); z-index: 10;
+    }
+    .admin-title { font-size: 17px; font-weight: 800; color: #fff; }
+    .admin-logout { font-size: 12px; color: #ff5566; cursor: pointer; }
+
+    .stat-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
+      padding: 12px;
+    }
+    .stat-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px;
+    }
+    .stat-box .n { font-size: 18px; font-weight: 800; color: var(--cyan); }
+    .stat-box .l { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .stat-box.alert .n { color: #ffaa33; }
+
+    .tabs { display: flex; gap: 6px; padding: 0 12px 10px; }
+    .tab-btn {
+      flex: 1; padding: 9px 0; text-align: center; font-size: 12px; font-weight: 700;
+      border-radius: 8px; border: 1px solid var(--border); color: #8aaabb; cursor: pointer;
+      background: var(--surface);
+    }
+    .tab-btn.active { background: var(--cyan); color: #04121c; border-color: var(--cyan); }
+
+    .tab-panel { display: none; padding: 0 12px 20px; }
+    .tab-panel.active { display: block; }
+
+    /* Inbox */
+    .conv-row {
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px; margin-bottom: 8px; cursor: pointer;
+    }
+    .conv-row.unread { border-color: var(--cyan); }
+    .conv-phone { font-weight: 700; color: #fff; font-size: 13px; }
+    .conv-preview { font-size: 12px; color: #7f9cb0; margin-top: 3px; max-width: 220px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .conv-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); flex-shrink: 0; }
+
+    /* Chat thread modal */
+    .thread-overlay {
+      position: fixed; inset: 0; background: #000c; z-index: 50;
+      display: none; flex-direction: column;
+    }
+    .thread-overlay.open { display: flex; }
+    .thread-scroll { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .thread-bubble-row { display: flex; }
+    .thread-bubble-row.mine { justify-content: flex-end; }
+    .thread-bubble { max-width: 78%; padding: 9px 12px; border-radius: 12px; font-size: 13px; white-space: pre-wrap; }
+    .thread-bubble-row.theirs .thread-bubble { background: var(--surface); border: 1px solid var(--border); color: #eaf6ff; }
+    .thread-bubble-row.mine .thread-bubble { background: var(--cyan); color: #04121c; font-weight: 500; }
+    .thread-input-bar { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--border); background: var(--bg); }
+    .thread-input { flex: 1; padding: 10px 14px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border); color: #fff; font-size: 13px; }
+    .thread-send { padding: 0 16px; border-radius: 20px; border: none; background: var(--cyan); color: #04121c; font-weight: 700; cursor: pointer; }
+
+    /* Withdrawals & Users tables */
+    .row-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px; margin-bottom: 8px;
+    }
+    .row-top { display: flex; justify-content: space-between; align-items: center; }
+    .row-amount { font-weight: 800; color: var(--cyan); font-size: 15px; }
+    .row-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+    .row-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .act-btn { flex: 1; padding: 8px 0; border-radius: 8px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .act-approve { background: #003322; color: #44ee88; border: 1px solid #33cc66; }
+    .act-reject { background: #220011; color: #ee4444; border: 1px solid #cc3333; }
+
+    .search-bar { padding: 0 12px 10px; }
+    .search-bar input {
+      width: 100%; padding: 9px 12px; border-radius: 10px; background: var(--surface);
+      border: 1px solid var(--border); color: #fff; font-size: 13px; box-sizing: border-box;
+    }
+
+    .empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="admin-bar">
+  <div class="admin-title">Manager Dashboard</div>
+  <div class="admin-logout" id="logout-btn">Log out</div>
+</div>
+
+<div class="stat-grid" id="stat-grid">
+  <div class="stat-box"><div class="n" id="s-users">—</div><div class="l">Total Users</div></div>
+  <div class="stat-box"><div class="n" id="s-deposits">—</div><div class="l">Total Deposits</div></div>
+  <div class="stat-box"><div class="n" id="s-withdrawn">—</div><div class="l">Total Withdrawn</div></div>
+  <div class="stat-box alert"><div class="n" id="s-pending">—</div><div class="l">Pending Withdrawals</div></div>
+</div>
+
+<div class="tabs">
+  <div class="tab-btn active" data-tab="inbox">Inbox <span id="tab-unread-badge"></span></div>
+  <div class="tab-btn" data-tab="withdrawals">Withdrawals</div>
+  <div class="tab-btn" data-tab="users">Users</div>
+</div>
+
+<div class="tab-panel active" id="panel-inbox">
+  <div id="conv-list"><div class="empty-state">No conversations yet</div></div>
+</div>
+
+<div class="tab-panel" id="panel-withdrawals">
+  <div id="withdraw-list"><div class="empty-state">No pending withdrawals</div></div>
+</div>
+
+<div class="tab-panel" id="panel-users">
+  <div class="search-bar"><input id="user-search" placeholder="Search phone or nickname…"></div>
+  <div id="user-list"><div class="empty-state">Loading…</div></div>
+</div>
+
+<!-- Chat thread overlay -->
+<div class="thread-overlay" id="thread-overlay">
+  <div class="admin-bar">
+    <div class="admin-title" id="thread-title">Chat</div>
+    <div class="admin-logout" id="thread-close" style="color:#8aaabb">Close</div>
+  </div>
+  <div class="thread-scroll" id="thread-scroll"></div>
+  <div class="thread-input-bar">
+    <input class="thread-input" id="thread-input" placeholder="Reply…">
+    <button class="thread-send" id="thread-send-btn">Send</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const fmt = n => parseFloat(n || 0).toLocaleString();
+
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  // ── Auth guard ────────────────────────────────────────────────────────────
+  fetch('/api/admin/me').then(r => r.json()).then(d => {
+    if (!d.ok) { window.location.href = 'login.html'; return; }
+    loadStats();
+    loadConversations();
+    loadWithdrawals();
+    loadUsers();
+  }).catch(() => { window.location.href = 'login.html'; });
+
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await fetch('/api/admin/logout', { method: 'POST' });
+    window.location.href = 'login.html';
+  });
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  async function loadStats() {
+    const r = await fetch('/api/admin/stats');
+    const d = await r.json();
+    if (!d.ok) return;
+    document.getElementById('s-users').textContent = d.users_count;
+    document.getElementById('s-deposits').textContent = fmt(d.total_deposits);
+    document.getElementById('s-withdrawn').textContent = fmt(d.total_withdrawn);
+    document.getElementById('s-pending').textContent = d.pending_withdraws;
+    document.getElementById('tab-unread-badge').textContent = d.unread_chats > 0 ? `(${d.unread_chats})` : '';
+  }
+
+  // ── Inbox ─────────────────────────────────────────────────────────────────
+  async function loadConversations() {
+    const r = await fetch('/api/admin/chat/conversations');
+    const d = await r.json();
+    const list = document.getElementById('conv-list');
+    if (!d.ok || !d.conversations.length) {
+      list.innerHTML = '<div class="empty-state">No conversations yet</div>';
+      return;
+    }
+    list.innerHTML = d.conversations.map(c => `
+      <div class="conv-row ${c.unread ? 'unread' : ''}" onclick="openThread(${c.user_id}, '${(c.nick || c.phone).replace(/'/g, '')}')">
+        <div>
+          <div class="conv-phone">${c.phone}</div>
+          <div class="conv-preview">${c.last_sender === 'admin' ? 'You: ' : ''}${(c.last_message || '').slice(0, 60)}</div>
+        </div>
+        ${c.unread ? '<div class="conv-dot"></div>' : ''}
+      </div>
+    `).join('');
+  }
+
+  let currentThreadUserId = null;
+
+  window.openThread = async function (userId, label) {
+    currentThreadUserId = userId;
+    document.getElementById('thread-title').textContent = label;
+    document.getElementById('thread-overlay').classList.add('open');
+    await loadThread();
+  };
+
+  async function loadThread() {
+    const r = await fetch(`/api/admin/chat/${currentThreadUserId}`);
+    const d = await r.json();
+    const scroll = document.getElementById('thread-scroll');
+    if (!d.ok) { scroll.innerHTML = '<div class="empty-state">Could not load messages</div>'; return; }
+    scroll.innerHTML = d.messages.map(m => `
+      <div class="thread-bubble-row ${m.sender === 'admin' ? 'mine' : 'theirs'}">
+        <div class="thread-bubble">${m.body}</div>
+      </div>
+    `).join('') || '<div class="empty-state">No messages yet</div>';
+    scroll.scrollTop = scroll.scrollHeight;
+  }
+
+  document.getElementById('thread-close').addEventListener('click', () => {
+    document.getElementById('thread-overlay').classList.remove('open');
+    loadConversations();
+    loadStats();
+  });
+
+  async function sendThreadReply() {
+    const input = document.getElementById('thread-input');
+    const body = input.value.trim();
+    if (!body || !currentThreadUserId) return;
+    input.value = '';
+    const r = await fetch(`/api/admin/chat/${currentThreadUserId}/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    });
+    const d = await r.json();
+    if (!d.ok) { toast('❌ ' + (d.error || 'Could not send')); return; }
+    loadThread();
+  }
+  document.getElementById('thread-send-btn').addEventListener('click', sendThreadReply);
+  document.getElementById('thread-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendThreadReply();
+  });
+
+  // ── Withdrawals ───────────────────────────────────────────────────────────
+  async function loadWithdrawals() {
+    const r = await fetch('/api/admin/withdrawals?status=pending');
+    const d = await r.json();
+    const list = document.getElementById('withdraw-list');
+    if (!d.ok || !d.withdrawals.length) {
+      list.innerHTML = '<div class="empty-state">No pending withdrawals</div>';
+      return;
+    }
+    list.innerHTML = d.withdrawals.map(w => `
+      <div class="row-card">
+        <div class="row-top">
+          <span class="row-amount">${fmt(w.amount)}</span>
+          <span class="row-sub">${w.created_at}</span>
+        </div>
+        <div class="row-sub">${w.phone} ${w.nick ? '· ' + w.nick : ''}</div>
+        <div class="row-actions">
+          <button class="act-btn act-approve" onclick="processWithdrawal(${w.id}, 'approve')">Approve</button>
+          <button class="act-btn act-reject" onclick="processWithdrawal(${w.id}, 'reject')">Reject & Refund</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  window.processWithdrawal = async function (id, action) {
+    const r = await fetch(`/api/admin/withdrawals/${id}/${action}`, { method: 'POST' });
+    const d = await r.json();
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast(action === 'approve' ? '✅ Approved' : '↩️ Rejected & refunded');
+    loadWithdrawals();
+    loadStats();
+  };
+
+  // ── Users ─────────────────────────────────────────────────────────────────
+  async function loadUsers(search) {
+    const url = search ? `/api/admin/users?search=${encodeURIComponent(search)}` : '/api/admin/users';
+    const r = await fetch(url);
+    const d = await r.json();
+    const list = document.getElementById('user-list');
+    if (!d.ok || !d.users.length) {
+      list.innerHTML = '<div class="empty-state">No users found</div>';
+      return;
+    }
+    list.innerHTML = d.users.map(u => `
+      <div class="row-card">
+        <div class="row-top">
+          <span class="row-amount">${fmt(u.balance)}</span>
+          <span class="row-sub">Joined ${u.created_at}</span>
+        </div>
+        <div class="row-sub">${u.phone} ${u.nick ? '· ' + u.nick : ''} · VIP ${u.vip_level}</div>
+        <div class="row-sub">Deposited ${fmt(u.total_deposit)} · Withdrawn ${fmt(u.total_withdraw)} · AI income ${fmt(u.ai_income)} · ${u.invite_count} invites</div>
+      </div>
+    `).join('');
+  }
+
+  let searchTimer = null;
+  document.getElementById('user-search').addEventListener('input', (e) => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => loadUsers(e.target.value.trim()), 300);
+  });
+
+  // Light polling so new messages/withdrawals show up without a manual refresh.
+  setInterval(() => { loadStats(); loadConversations(); loadWithdrawals(); }, 10000);
+</script>
+</body>
+  </html>
+  
