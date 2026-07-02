@@ -170,7 +170,7 @@
     try {
       const r = await fetch('/api/me');
       const d = await r.json();
-      if (!d.ok) { window.location.href = 'login.html'; return; }
+      if (!d.ok) { window.location.href = 'index.html'; return; }
       const u = d.user;
       document.getElementById('h-deposit').textContent    = fmt(u.total_deposit);
       document.getElementById('h-withdraw').textContent   = fmt(u.total_withdraw);
@@ -202,4 +202,5 @@
   loadMessages();
 </script>
 </body>
-</html>
+        </html>
+        
