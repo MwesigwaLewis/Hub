@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Future AI Hub — Chat with Manager</title>
   <link rel="stylesheet" href="assets/shared.css">
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  
   <style>
     .chat-page { display: flex; flex-direction: column; height: 100vh; }
     .chat-scroll {
@@ -73,14 +73,14 @@
 
   <div class="chat-scroll" id="chat-scroll">
     <div class="empty-state" id="chat-empty">
-      <div class="empty-icon">💬</div>
-      Send a message and the manager will reply here
+      <div class="empty-icon"></div>
+      Messages with the manager will appear here...
     </div>
   </div>
 
   <div class="chat-input-bar">
     <textarea class="chat-input" id="chat-input" placeholder="Message the manager…" rows="1"></textarea>
-    <div class="menu-icon"><i data-lucide="credit-card"></i></div>
+    <div class="menu-icon"><i data-lucide="key-round"></i></div>
     <button class="chat-send-btn" id="chat-send-btn" aria-label="Send">
       <i data-lucide="send"></i>
     </button>
@@ -177,6 +177,8 @@
   loadMessages();
   pollTimer = setInterval(loadMessages, 4000);
   window.addEventListener('beforeunload', () => clearInterval(pollTimer));
+
+  lucide.createIcons()
 </script>
 </body>
 </html>
