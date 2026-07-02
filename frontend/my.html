@@ -115,7 +115,7 @@
           <div class="my-phone" id="my-phone">—</div>
           <div class="my-nick" id="my-nick">—</div>
         </div>
-        <div class="my-vip-badge" id="my-vip">VIP - 1</div>
+        <div class="my-vip-badge" id="my-vip" style="visibility:hidden"></div>
       </div>
     </div>
 
@@ -159,10 +159,10 @@
           <div class="menu-icon"><i data-lucide="star"></i></div>
           <span class="menu-lbl">VIP Task</span>
         </div>
-        <div class="menu-item" onclick="toast('Rewards Center')">
+        <a class="menu-item" href="reward.html">
           <div class="menu-icon"><i data-lucide="gift"></i></div>
           <span class="menu-lbl">Reward</span>
-        </div>
+        </a>
         <a class="menu-item" href="raffle.html">
           <div class="menu-icon"><i data-lucide="cog"></i></div>
           <span class="menu-lbl">Raffle</span>
@@ -268,7 +268,16 @@
       const u = d.user;
       document.getElementById('my-phone').textContent   = u.phone;
       document.getElementById('my-nick').textContent    = u.nick || '—';
-      document.getElementById('my-vip').textContent     = 'VIP - ' + (u.vip_level || 1);
+      const vipEl = document.getElementById('my-vip');
+      if (u.vip_level && u.vip_level > 0) {
+        vipEl.textContent = 'VIP - ' + u.vip_level;
+        vipEl.style.visibility = 'visible';
+      } else {
+        // No VIP status yet — leave the space blank rather than showing a
+        // "VIP - 0" badge or defaulting everyone to VIP 1.
+        vipEl.textContent = '';
+        vipEl.style.visibility = 'hidden';
+      }
       document.getElementById('my-wallet').textContent  = fmt(u.wallet);
       document.getElementById('my-balance').textContent = fmt(u.balance);
       document.getElementById('last-salary').textContent = fmt(u.last_salary);
@@ -437,9 +446,10 @@
   function copyInvite() {
     if (!currentUser) return;
     const code = currentUser.invite_code || '—';
-    navigator.clipboard.writeText(code)
-      .then(() => toast('Invite code copied: ' + code))
-      .catch(() => toast('Your invite code: ' + code));
+    const link = `${window.location.origin}/index.html?ref=${encodeURIComponent(code)}`;
+    navigator.clipboard.writeText(link)
+      .then(() => toast('Invite link copied!'))
+      .catch(() => toast('Your invite link: ' + link));
   }
 
   loadUser();
@@ -447,4 +457,5 @@
 </script>
 </body>
   </html>
-            
+
+          
