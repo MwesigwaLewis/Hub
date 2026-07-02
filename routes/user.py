@@ -30,6 +30,65 @@ def me(current_user):
         'this_salary':   current_user['this_salary'],
     }})
 
+# ── GET /api/team ─────────────────────────────────────────────────────────────
+# Two-level downline: level 1 = people the user invited directly, level 2 =
+# people THEY invited. For each member, also list the machines they've
+# bought (so the user can see who's actually active).
+@user_bp.route('/team', methods=['GET'])
+@login_required
+def team(current_user):
+    db = get_db()
+    try:
+        level1 = db.execute(
+            "SELECT id, phone, nick, created_at FROM users WHERE invited_by=? ORDER BY created_at DESC",
+            (current_user['id'],)
+        ).fetchall()
+        level1_ids = [row['id'] for row in level1]
+
+        level2 = []
+        if level1_ids:
+            placeholders = ','.join(['?'] * len(level1_ids))
+            level2 = db.execute(
+                f"""SELECT id, phone, nick, invited_by, created_at
+                    FROM users WHERE invited_by IN ({placeholders})
+                    ORDER BY created_at DESC""",
+                tuple(level1_ids)
+            ).fetchall()
+
+        all_ids = level1_ids + [row['id'] for row in level2]
+        machines_by_user = {}
+        if all_ids:
+            placeholders = ','.join(['?'] * len(all_ids))
+            rows = db.execute(
+                f"""SELECT um.user_id, um.machine_id, um.purchase_price, um.status, um.bought_at
+                    FROM user_machines um WHERE um.user_id IN ({placeholders})
+                    ORDER BY um.bought_at DESC""",
+                tuple(all_ids)
+            ).fetchall()
+            for r in rows:
+                machines_by_user.setdefault(r['user_id'], []).append({
+                    'machine_id':     r['machine_id'],
+                    'purchase_price': r['purchase_price'],
+                    'status':         r['status'],
+                    'bought_at':      r['bought_at'].strftime('%Y-%m-%d') if r['bought_at'] else None,
+                })
+
+        def fmt_member(row):
+            return {
+                'phone':    row['phone'],
+                'nick':     row['nick'],
+                'joined':   row['created_at'].strftime('%Y-%m-%d') if row['created_at'] else None,
+                'machines': machines_by_user.get(row['id'], []),
+            }
+
+        return jsonify({
+            'ok': True,
+            'level1': [fmt_member(r) for r in level1],
+            'level2': [fmt_member(r) for r in level2],
+        })
+    finally:
+        db.close()
+
 # ── POST /api/profile/nick ────────────────────────────────────────────────────
 @user_bp.route('/profile/nick', methods=['POST'])
 @login_required
