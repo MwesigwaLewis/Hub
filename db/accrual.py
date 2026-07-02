@@ -10,6 +10,12 @@ external cron job that doesn't exist in this project.
 Call accrue_user_earnings(db, user_id) once per authenticated request
 (wired into middleware/auth.py) BEFORE reading the user row, so every page
 the user loads reflects up-to-the-second earnings.
+
+Performance note: this used to issue one UPDATE (and one INSERT) per
+running machine, so a user with N machines cost N+1 sequential DB round
+trips on every single page load. It's now batched into at most 4 round
+trips total regardless of N — one SELECT, one batched UPDATE, one batched
+INSERT, one UPDATE on the user row.
 """
 from datetime import datetime, timezone
 
@@ -43,6 +49,8 @@ def accrue_user_earnings(db, user_id):
 
     now = datetime.now(timezone.utc)
     total_delta = 0.0
+    machine_updates = []   # (id, earned, status)
+    tx_rows = []            # (user_id, type, amount, note)
 
     for m in machines:
         bought_at = _as_utc(m['bought_at']) or now
@@ -52,29 +60,35 @@ def accrue_user_earnings(db, user_id):
         elapsed_days = max(elapsed_seconds.total_seconds(), 0) / 86400.0
 
         accrued = min(m['daily_income'] * elapsed_days, m['total_income'])
-        delta = accrued - m['earned']
-
-        if delta <= 0:
-            # Nothing new accrued yet (e.g. purchased seconds ago) — still
-            # flip to expired below if fully paid out and past expiry.
-            delta = 0
-        else:
-            total_delta += delta
-
+        delta = max(accrued - m['earned'], 0)
         newly_expired = expires_at is not None and now >= expires_at
 
-        db.execute("""
-            UPDATE user_machines
-            SET earned = ?,
-                status = ?
-            WHERE id = ?
-        """, (accrued, 'expired' if newly_expired else 'running', m['id']))
+        machine_updates.append((m['id'], accrued, 'expired' if newly_expired else 'running'))
 
         if delta > 0:
-            db.execute(
-                "INSERT INTO transactions (user_id, type, amount, note) VALUES (?,?,?,?)",
-                (user_id, 'ai_income', delta, f"AI machine income (machine #{m['id']})")
-            )
+            total_delta += delta
+            tx_rows.append((user_id, 'ai_income', delta, f"AI machine income (machine #{m['id']})"))
+
+    # One round trip to update every machine at once, instead of one UPDATE
+    # per machine. Explicit casts avoid "could not determine data type of
+    # parameter" errors, since a bare VALUES list has no inherent column type.
+    values_sql = ','.join(['(%s::int,%s::double precision,%s::text)'] * len(machine_updates))
+    flat_params = [v for row in machine_updates for v in row]
+    db.execute(f"""
+        UPDATE user_machines AS um
+        SET earned = v.earned, status = v.status
+        FROM (VALUES {values_sql}) AS v(id, earned, status)
+        WHERE um.id = v.id
+    """, tuple(flat_params))
+
+    # Same idea for the income-ledger rows: one INSERT for all of them.
+    if tx_rows:
+        values_sql = ','.join(['(%s,%s,%s,%s)'] * len(tx_rows))
+        flat_params = [v for row in tx_rows for v in row]
+        db.execute(f"""
+            INSERT INTO transactions (user_id, type, amount, note)
+            VALUES {values_sql}
+        """, tuple(flat_params))
 
     if total_delta > 0:
         db.execute("""
@@ -86,5 +100,4 @@ def accrue_user_earnings(db, user_id):
         """, (total_delta, total_delta, total_delta, user_id))
 
     db.commit()
-
     
