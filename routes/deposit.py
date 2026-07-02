@@ -3,6 +3,7 @@ import requests
 from datetime import datetime
 from flask import Blueprint, request, jsonify
 from db.database import get_db
+from db.vip import recompute_vip_level
 from middleware.auth import login_required
 
 deposit_bp = Blueprint('deposit', __name__, url_prefix='/api')
@@ -113,6 +114,14 @@ def verify_deposit(current_user):
         if txn.get('tx_ref') != tx_ref:
             return jsonify({'ok': False, 'error': 'Reference mismatch'})
 
+        # Needed for VIP progression below — must run BEFORE we mark this
+        # deposit successful, so it correctly excludes the current one.
+        prior_successful = db.execute(
+            "SELECT COUNT(*) AS c FROM deposit_transactions WHERE user_id=? AND status='successful'",
+            (current_user['id'],)
+        ).fetchone()['c']
+        is_first_deposit = (prior_successful == 0)
+
         # ── All checks passed — credit the balance ────────────────────────────
         credited = flw_amount  # credit exact amount Flutterwave confirmed
         network  = txn.get('payment_type', '')
@@ -139,10 +148,21 @@ def verify_deposit(current_user):
             (current_user['id'], 'deposit', credited,
              f'Mobile money deposit via {network} — ref:{tx_ref}')
         )
+
+        # VIP progression: the referrer's level rises based on how many of
+        # their direct invites have EVER deposited — counted once per
+        # invitee, on that invitee's first successful deposit only, so
+        # repeat deposits from the same person don't keep bumping it.
+        if is_first_deposit and current_user['invited_by']:
+            db.execute(
+                "UPDATE users SET depositing_invites = depositing_invites + 1 WHERE id=?",
+                (current_user['invited_by'],)
+            )
+            recompute_vip_level(db, current_user['invited_by'])
+
         db.commit()
 
         return jsonify({'ok': True, 'credited_amount': credited})
 
     finally:
         db.close()
-    
