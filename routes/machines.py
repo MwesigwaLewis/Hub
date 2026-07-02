@@ -61,18 +61,22 @@ def buy_machine(current_user):
             return jsonify({'ok': False, 'error': 'Machine not found'})
         if machine['sold']:
             return jsonify({'ok': False, 'error': 'Machine is sold out'})
-        if current_user['balance'] < machine['price']:
-            return jsonify({'ok': False, 'error': 'Insufficient balance'})
 
         lock_days    = machine['lock']
         daily_income = round(machine['income'] / lock_days, 2)
         expires_at   = datetime.utcnow() + timedelta(days=lock_days)
 
-        # Deduct balance
-        db.execute(
-            "UPDATE users SET balance=balance-? WHERE id=?",
-            (machine['price'], current_user['id'])
+        # Deduct balance atomically: the WHERE clause re-checks the balance
+        # as part of the same UPDATE, so two concurrent buy requests can't
+        # both pass a separate "is balance enough?" check and overdraw the
+        # account (a classic TOCTOU race).
+        result = db.execute(
+            "UPDATE users SET balance=balance-? WHERE id=? AND balance>=?",
+            (machine['price'], current_user['id'], machine['price'])
         )
+        if result.rowcount == 0:
+            db.rollback()
+            return jsonify({'ok': False, 'error': 'Insufficient balance'})
 
         # Record ownership
         db.execute("""
@@ -92,4 +96,5 @@ def buy_machine(current_user):
         return jsonify({'ok': True})
     finally:
         db.close()
-                   
+
+    
