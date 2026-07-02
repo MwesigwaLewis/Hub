@@ -26,6 +26,10 @@ class _CursorWrapper:
     def fetchall(self):
         return self._cur.fetchall()
 
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
 
 class _ConnWrapper:
     """Wraps a psycopg connection so existing route code — db.execute(...),
@@ -41,6 +45,9 @@ class _ConnWrapper:
 
     def commit(self):
         self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
 
     def close(self):
         self._conn.close()
@@ -68,7 +75,7 @@ def init_db():
             id             SERIAL PRIMARY KEY,
             phone          TEXT NOT NULL UNIQUE,
             password       TEXT NOT NULL,
-            nick           TEXT NOT NULL DEFAULT Anon,
+            nick           TEXT NOT NULL DEFAULT 'Anon',
             avatar_url     TEXT,
             email          TEXT,
             vip_level      INTEGER NOT NULL DEFAULT 1,
@@ -235,4 +242,5 @@ def init_db():
     cur.close()
     conn.close()
     print("[DB] All tables ready (Supabase/Postgres).")
+
     
