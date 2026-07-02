@@ -86,4 +86,5 @@ def accrue_user_earnings(db, user_id):
         """, (total_delta, total_delta, total_delta, user_id))
 
     db.commit()
-  
+
+    
