@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Future AI Hub — My</title>
   <link rel="stylesheet" href="assets/shared.css">
+  <!-- Lucide icon set (https://lucide.dev) -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <style>
     /* ── PROFILE HEADER ── */
     .my-header {
@@ -74,6 +76,7 @@
       font-size: 22px;
       transition: transform 0.12s, opacity 0.12s;
     }
+    .menu-icon svg { width: 24px; height: 24px; stroke: #fff; }
     .menu-item:active .menu-icon { transform: scale(0.9); opacity: 0.85; }
     .menu-lbl { font-size: 11px; color: #8aaabb; text-align: center; line-height: 1.3; font-weight: 500; }
 
@@ -133,47 +136,47 @@
     <div class="menu-section">
       <div class="menu-grid">
         <div class="menu-item" onclick="openDeposit()">
-          <div class="menu-icon">💳</div>
+          <div class="menu-icon"><i data-lucide="credit-card"></i></div>
           <span class="menu-lbl">Deposit</span>
         </div>
         <div class="menu-item" onclick="openWithdraw()">
-          <div class="menu-icon">💸</div>
+          <div class="menu-icon"><i data-lucide="banknote"></i></div>
           <span class="menu-lbl">Withdraw</span>
         </div>
         <a class="menu-item" href="bill.html">
-          <div class="menu-icon">📋</div>
+          <div class="menu-icon"><i data-lucide="file-text"></i></div>
           <span class="menu-lbl">Bill</span>
         </a>
         <div class="menu-item" onclick="copyInvite()">
-          <div class="menu-icon">🤝</div>
+          <div class="menu-icon"><i data-lucide="handshake"></i></div>
           <span class="menu-lbl">Invite</span>
         </div>
         <div class="menu-item" onclick="toast('My Team')">
-          <div class="menu-icon">👥</div>
+          <div class="menu-icon"><i data-lucide="users"></i></div>
           <span class="menu-lbl">My team</span>
         </div>
         <div class="menu-item" onclick="toast('VIP Tasks')">
-          <div class="menu-icon">⭐</div>
+          <div class="menu-icon"><i data-lucide="star"></i></div>
           <span class="menu-lbl">VIP Task</span>
         </div>
         <div class="menu-item" onclick="toast('Rewards Center')">
-          <div class="menu-icon">🎁</div>
+          <div class="menu-icon"><i data-lucide="gift"></i></div>
           <span class="menu-lbl">Reward</span>
         </div>
         <a class="menu-item" href="raffle.html">
-          <div class="menu-icon">🎰</div>
+          <div class="menu-icon"><i data-lucide="ticket"></i></div>
           <span class="menu-lbl">Raffle</span>
         </a>
         <div class="menu-item" onclick="toast('Download link')">
-          <div class="menu-icon">📥</div>
+          <div class="menu-icon"><i data-lucide="download"></i></div>
           <span class="menu-lbl">Download App</span>
         </div>
         <div class="menu-item" onclick="toast('Contact Manager')">
-          <div class="menu-icon">🎧</div>
+          <div class="menu-icon"><i data-lucide="headphones"></i></div>
           <span class="menu-lbl">Manager</span>
         </div>
         <a class="menu-item" href="settings.html">
-          <div class="menu-icon">⚙️</div>
+          <div class="menu-icon"><i data-lucide="settings"></i></div>
           <span class="menu-lbl">Settings</span>
         </a>
       </div>
@@ -260,7 +263,7 @@
     try {
       const r = await fetch('/api/me');
       const d = await r.json();
-      if (!d.ok) { window.location.href = 'login.html'; return; }
+      if (!d.ok) { window.location.href = 'index.html'; return; }
       currentUser = d.user;
       const u = d.user;
       document.getElementById('my-phone').textContent   = u.phone;
@@ -440,6 +443,8 @@
   }
 
   loadUser();
+  lucide.createIcons();
 </script>
 </body>
-</html>
+  </html>
+            
