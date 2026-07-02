@@ -91,3 +91,81 @@ function initWaveBg() {
 
 initWaveBg();
 
+/* ════════════════════════════════════════
+   PWA INSTALL / "DOWNLOAD APP"
+   Real .apk compilation needs an Android SDK + signing toolchain that
+   doesn't exist in a plain web stack, so "Download App" installs Future AI
+   Hub as a Progressive Web App instead — same icon-on-homescreen, full-screen,
+   offline-capable result a TWA-wrapped APK would give you, with no app store
+   review and no APK to host. See PWA_TO_APK.md if you specifically need a
+   .apk file (e.g. for a store listing) — it walks through wrapping this
+   same PWA with PWABuilder once it's deployed at a real URL.
+════════════════════════════════════════ */
+
+// Make the manifest + theme-color discoverable on every page without
+// having to hand-edit <head> in 9 separate HTML files.
+(function injectPwaHeadTags() {
+  if (!document.querySelector('link[rel="manifest"]')) {
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = 'manifest.json';
+    document.head.appendChild(link);
+  }
+  if (!document.querySelector('meta[name="theme-color"]')) {
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    meta.content = '#060a10';
+    document.head.appendChild(meta);
+  }
+})();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+// Chrome/Android fires this ~instantly if install criteria are met; we stash
+// it and use it later so the button can trigger the native prompt on tap
+// (browsers require install() to be called from a user gesture).
+window.__deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  window.__deferredInstallPrompt = e;
+});
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+         window.navigator.standalone === true; // iOS Safari
+}
+
+function isIOS() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+async function installApp() {
+  if (isStandalone()) {
+    toast('Future AI Hub is already installed');
+    return;
+  }
+
+  if (window.__deferredInstallPrompt) {
+    window.__deferredInstallPrompt.prompt();
+    const { outcome } = await window.__deferredInstallPrompt.userChoice;
+    window.__deferredInstallPrompt = null;
+    toast(outcome === 'accepted' ? 'Installing…' : 'Install cancelled');
+    return;
+  }
+
+  if (isIOS()) {
+    toast('Tap Share, then "Add to Home Screen"');
+    return;
+  }
+
+  // No native prompt available yet (criteria not met, already dismissed
+  // this session, or an unsupported browser) — this is the same "just tell
+  // them what to do" fallback a store-listing APK button would need anyway.
+  toast('Open this site in Chrome, then use the browser menu → "Install app"');
+}
+
+                            
