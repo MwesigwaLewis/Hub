@@ -15,28 +15,29 @@
     .admin-title { font-size: 17px; font-weight: 800; color: #fff; }
     .admin-logout { font-size: 12px; color: #ff5566; cursor: pointer; }
 
-    .stat-grid {
-      display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;
-      padding: 12px;
-    }
-    .stat-box {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 12px; padding: 12px;
-    }
+    .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 12px; }
+    .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
     .stat-box .n { font-size: 18px; font-weight: 800; color: var(--cyan); }
     .stat-box .l { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
     .stat-box.alert .n { color: #ffaa33; }
 
-    .tabs { display: flex; gap: 6px; padding: 0 12px 10px; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 10px; }
     .tab-btn {
-      flex: 1; padding: 9px 0; text-align: center; font-size: 12px; font-weight: 700;
+      padding: 8px 12px; text-align: center; font-size: 12px; font-weight: 700;
       border-radius: 8px; border: 1px solid var(--border); color: #8aaabb; cursor: pointer;
       background: var(--surface);
     }
     .tab-btn.active { background: var(--cyan); color: #04121c; border-color: var(--cyan); }
 
-    .tab-panel { display: none; padding: 0 12px 20px; }
+    .tab-panel { display: none; padding: 0 12px 24px; }
     .tab-panel.active { display: block; }
+
+    .section-head { display: flex; justify-content: space-between; align-items: center; margin: 4px 0 10px; }
+    .section-head h3 { font-size: 14px; color: #fff; margin: 0; }
+    .add-btn {
+      font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 8px;
+      border: 1px solid var(--cyan); background: transparent; color: var(--cyan); cursor: pointer;
+    }
 
     /* Inbox */
     .conv-row {
@@ -50,12 +51,14 @@
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .conv-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); flex-shrink: 0; }
 
-    /* Chat thread modal */
-    .thread-overlay {
+    /* Overlays (thread / user detail / add-machine / add-manager) */
+    .overlay {
       position: fixed; inset: 0; background: #000c; z-index: 50;
       display: none; flex-direction: column;
     }
-    .thread-overlay.open { display: flex; }
+    .overlay.open { display: flex; }
+    .overlay-scroll { flex: 1; overflow-y: auto; padding: 12px; }
+
     .thread-scroll { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
     .thread-bubble-row { display: flex; }
     .thread-bubble-row.mine { justify-content: flex-end; }
@@ -66,26 +69,39 @@
     .thread-input { flex: 1; padding: 10px 14px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border); color: #fff; font-size: 13px; }
     .thread-send { padding: 0 16px; border-radius: 20px; border: none; background: var(--cyan); color: #04121c; font-weight: 700; cursor: pointer; }
 
-    /* Withdrawals & Users tables */
-    .row-card {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-      padding: 12px; margin-bottom: 8px;
-    }
+    /* Generic rows */
+    .row-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 8px; }
     .row-top { display: flex; justify-content: space-between; align-items: center; }
     .row-amount { font-weight: 800; color: var(--cyan); font-size: 15px; }
     .row-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
-    .row-actions { display: flex; gap: 8px; margin-top: 10px; }
-    .act-btn { flex: 1; padding: 8px 0; border-radius: 8px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .row-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .act-btn { flex: 1; padding: 8px 0; border-radius: 8px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; min-width: 80px; }
     .act-approve { background: #003322; color: #44ee88; border: 1px solid #33cc66; }
     .act-reject { background: #220011; color: #ee4444; border: 1px solid #cc3333; }
+    .act-neutral { background: #0e1828; color: #8aaabb; border: 1px solid var(--border); }
+    .status-pill { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+    .pill-successful, .pill-approved, .pill-running { background: #003322; color: #44ee88; }
+    .pill-pending { background: #2a2200; color: #ffcc44; }
+    .pill-failed, .pill-rejected, .pill-expired { background: #220011; color: #ee4444; }
 
-    .search-bar { padding: 0 12px 10px; }
-    .search-bar input {
-      width: 100%; padding: 9px 12px; border-radius: 10px; background: var(--surface);
+    .search-bar { padding: 0 0 10px; }
+    .search-bar input, .form-field input, .form-field textarea, .form-field select {
+      width: 100%; padding: 9px 12px; border-radius: 10px; background: #041220;
       border: 1px solid var(--border); color: #fff; font-size: 13px; box-sizing: border-box;
+      font-family: inherit;
     }
+    .form-field { margin-bottom: 10px; }
+    .form-field label { display: block; font-size: 11px; color: #8aaabb; margin-bottom: 5px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-actions { display: flex; gap: 8px; margin-top: 6px; }
+    .btn-primary { flex: 1; padding: 11px; border: none; border-radius: 10px; background: var(--cyan); color: #04121c; font-weight: 700; font-size: 13px; cursor: pointer; }
+    .btn-danger { flex: 1; padding: 11px; border: 1px solid #cc3333; border-radius: 10px; background: #220011; color: #ee4444; font-weight: 700; font-size: 13px; cursor: pointer; }
+    .btn-secondary { flex: 1; padding: 11px; border: 1px solid var(--border); border-radius: 10px; background: #0e1828; color: #8aaabb; font-weight: 700; font-size: 13px; cursor: pointer; }
 
+    .divider { border-top: 1px solid var(--border); margin: 16px 0; }
+    .sub-heading { font-size: 12px; font-weight: 700; color: var(--cyan); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
     .empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+    .mini-note { font-size: 11px; color: #5a8aaa; margin-top: -4px; margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -97,7 +113,7 @@
   <div class="admin-logout" id="logout-btn">Log out</div>
 </div>
 
-<div class="stat-grid" id="stat-grid">
+<div class="stat-grid">
   <div class="stat-box"><div class="n" id="s-users">—</div><div class="l">Total Users</div></div>
   <div class="stat-box"><div class="n" id="s-deposits">—</div><div class="l">Total Deposits</div></div>
   <div class="stat-box"><div class="n" id="s-withdrawn">—</div><div class="l">Total Withdrawn</div></div>
@@ -108,24 +124,63 @@
   <div class="tab-btn active" data-tab="inbox">Inbox <span id="tab-unread-badge"></span></div>
   <div class="tab-btn" data-tab="withdrawals">Withdrawals</div>
   <div class="tab-btn" data-tab="users">Users</div>
+  <div class="tab-btn" data-tab="machines">Machines</div>
+  <div class="tab-btn" data-tab="deposits">Deposits</div>
+  <div class="tab-btn" data-tab="managers">Managers</div>
+  <div class="tab-btn" data-tab="announcements">Announcements</div>
 </div>
 
+<!-- INBOX -->
 <div class="tab-panel active" id="panel-inbox">
   <div id="conv-list"><div class="empty-state">No conversations yet</div></div>
 </div>
 
+<!-- WITHDRAWALS -->
 <div class="tab-panel" id="panel-withdrawals">
   <div id="withdraw-list"><div class="empty-state">No pending withdrawals</div></div>
 </div>
 
+<!-- USERS -->
 <div class="tab-panel" id="panel-users">
   <div class="search-bar"><input id="user-search" placeholder="Search phone or nickname…"></div>
   <div id="user-list"><div class="empty-state">Loading…</div></div>
 </div>
+
+<!-- MACHINES -->
+<div class="tab-panel" id="panel-machines">
+  <div class="section-head">
+    <h3>Machine Catalogue</h3>
+    <button class="add-btn" onclick="openAddMachine()">+ Add Machine</button>
+  </div>
+  <div id="machine-list"><div class="empty-state">Loading…</div></div>
 </div>
 
-<!-- Chat thread overlay (its own position:fixed layer, sits above .page regardless) -->
-<div class="thread-overlay" id="thread-overlay">
+<!-- DEPOSITS -->
+<div class="tab-panel" id="panel-deposits">
+  <div id="deposit-list"><div class="empty-state">Loading…</div></div>
+</div>
+
+<!-- MANAGERS -->
+<div class="tab-panel" id="panel-managers">
+  <div class="section-head">
+    <h3>Manager Accounts</h3>
+    <button class="add-btn" onclick="openAddManager()">+ Add Manager</button>
+  </div>
+  <div id="manager-list"><div class="empty-state">Loading…</div></div>
+</div>
+
+<!-- ANNOUNCEMENTS -->
+<div class="tab-panel" id="panel-announcements">
+  <div class="section-head">
+    <h3>Announcements</h3>
+    <button class="add-btn" onclick="openAddAnnouncement()">+ New</button>
+  </div>
+  <div id="announcement-list"><div class="empty-state">Loading…</div></div>
+</div>
+</div>
+
+<!-- ═══ Chat thread overlay ═══ -->
+<div class="overlay" id="thread-overlay">
   <div class="admin-bar">
     <div class="admin-title" id="thread-title">Chat</div>
     <div class="admin-logout" id="thread-close" style="color:#8aaabb">Close</div>
@@ -137,31 +192,62 @@
   </div>
 </div>
 
+<!-- ═══ User detail / edit overlay ═══ -->
+<div class="overlay" id="user-overlay">
+  <div class="admin-bar">
+    <div class="admin-title" id="user-overlay-title">User</div>
+    <div class="admin-logout" id="user-overlay-close" style="color:#8aaabb">Close</div>
+  </div>
+  <div class="overlay-scroll" id="user-overlay-body"></div>
+</div>
+
+<!-- ═══ Generic form overlay (add machine / add manager / add announcement) ═══ -->
+<div class="overlay" id="form-overlay">
+  <div class="admin-bar">
+    <div class="admin-title" id="form-overlay-title">Add</div>
+    <div class="admin-logout" id="form-overlay-close" style="color:#8aaabb">Close</div>
+  </div>
+  <div class="overlay-scroll" id="form-overlay-body"></div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
   const fmt = n => parseFloat(n || 0).toLocaleString();
+  const esc = s => { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; };
 
   function toast(msg) {
     const el = document.getElementById('toast');
     el.textContent = msg;
     el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 2200);
+    setTimeout(() => el.classList.remove('show'), 2400);
+  }
+
+  async function api(url, opts) {
+    const r = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+      ...opts,
+    });
+    return r.json();
   }
 
   // ── Auth guard ────────────────────────────────────────────────────────────
-  fetch('/api/admin/me').then(r => r.json()).then(d => {
+  let ME = null;
+  api('/api/admin/me').then(d => {
     if (!d.ok) { window.location.href = 'login.html'; return; }
-    loadStats();
-    loadConversations();
-    loadWithdrawals();
-    loadUsers();
+    ME = d;
+    refreshAll();
   }).catch(() => { window.location.href = 'login.html'; });
 
   document.getElementById('logout-btn').addEventListener('click', async () => {
-    await fetch('/api/admin/logout', { method: 'POST' });
+    await api('/api/admin/logout', { method: 'POST' });
     window.location.href = 'login.html';
   });
+
+  function refreshAll() {
+    loadStats(); loadConversations(); loadWithdrawals();
+    loadUsers(); loadMachines(); loadDeposits(); loadManagers(); loadAnnouncements();
+  }
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -173,10 +259,13 @@
     });
   });
 
+  function closeOverlays() {
+    document.querySelectorAll('.overlay').forEach(o => o.classList.remove('open'));
+  }
+
   // ── Stats ─────────────────────────────────────────────────────────────────
   async function loadStats() {
-    const r = await fetch('/api/admin/stats');
-    const d = await r.json();
+    const d = await api('/api/admin/stats');
     if (!d.ok) return;
     document.getElementById('s-users').textContent = d.users_count;
     document.getElementById('s-deposits').textContent = fmt(d.total_deposits);
@@ -185,20 +274,16 @@
     document.getElementById('tab-unread-badge').textContent = d.unread_chats > 0 ? `(${d.unread_chats})` : '';
   }
 
-  // ── Inbox ─────────────────────────────────────────────────────────────────
+  /* ══════════════════════ INBOX ══════════════════════ */
   async function loadConversations() {
-    const r = await fetch('/api/admin/chat/conversations');
-    const d = await r.json();
+    const d = await api('/api/admin/chat/conversations');
     const list = document.getElementById('conv-list');
-    if (!d.ok || !d.conversations.length) {
-      list.innerHTML = '<div class="empty-state">No conversations yet</div>';
-      return;
-    }
+    if (!d.ok || !d.conversations.length) { list.innerHTML = '<div class="empty-state">No conversations yet</div>'; return; }
     list.innerHTML = d.conversations.map(c => `
-      <div class="conv-row ${c.unread ? 'unread' : ''}" onclick="openThread(${c.user_id}, '${(c.nick || c.phone).replace(/'/g, '')}')">
+      <div class="conv-row ${c.unread ? 'unread' : ''}" onclick="openThread(${c.user_id}, '${esc(c.nick || c.phone)}')">
         <div>
-          <div class="conv-phone">${c.phone}</div>
-          <div class="conv-preview">${c.last_sender === 'admin' ? 'You: ' : ''}${(c.last_message || '').slice(0, 60)}</div>
+          <div class="conv-phone">${esc(c.phone)}</div>
+          <div class="conv-preview">${c.last_sender === 'admin' ? 'You: ' : ''}${esc((c.last_message || '').slice(0, 60))}</div>
         </div>
         ${c.unread ? '<div class="conv-dot"></div>' : ''}
       </div>
@@ -206,68 +291,47 @@
   }
 
   let currentThreadUserId = null;
-
   window.openThread = async function (userId, label) {
     currentThreadUserId = userId;
     document.getElementById('thread-title').textContent = label;
     document.getElementById('thread-overlay').classList.add('open');
     await loadThread();
   };
-
   async function loadThread() {
-    const r = await fetch(`/api/admin/chat/${currentThreadUserId}`);
-    const d = await r.json();
+    const d = await api(`/api/admin/chat/${currentThreadUserId}`);
     const scroll = document.getElementById('thread-scroll');
     if (!d.ok) { scroll.innerHTML = '<div class="empty-state">Could not load messages</div>'; return; }
     scroll.innerHTML = d.messages.map(m => `
       <div class="thread-bubble-row ${m.sender === 'admin' ? 'mine' : 'theirs'}">
-        <div class="thread-bubble">${m.body}</div>
+        <div class="thread-bubble">${esc(m.body)}</div>
       </div>
     `).join('') || '<div class="empty-state">No messages yet</div>';
     scroll.scrollTop = scroll.scrollHeight;
   }
-
   document.getElementById('thread-close').addEventListener('click', () => {
-    document.getElementById('thread-overlay').classList.remove('open');
-    loadConversations();
-    loadStats();
+    closeOverlays(); loadConversations(); loadStats();
   });
-
   async function sendThreadReply() {
     const input = document.getElementById('thread-input');
     const body = input.value.trim();
     if (!body || !currentThreadUserId) return;
     input.value = '';
-    const r = await fetch(`/api/admin/chat/${currentThreadUserId}/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ body }),
-    });
-    const d = await r.json();
+    const d = await api(`/api/admin/chat/${currentThreadUserId}/send`, { method: 'POST', body: JSON.stringify({ body }) });
     if (!d.ok) { toast('❌ ' + (d.error || 'Could not send')); return; }
     loadThread();
   }
   document.getElementById('thread-send-btn').addEventListener('click', sendThreadReply);
-  document.getElementById('thread-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') sendThreadReply();
-  });
+  document.getElementById('thread-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendThreadReply(); });
 
-  // ── Withdrawals ───────────────────────────────────────────────────────────
+  /* ══════════════════════ WITHDRAWALS ══════════════════════ */
   async function loadWithdrawals() {
-    const r = await fetch('/api/admin/withdrawals?status=pending');
-    const d = await r.json();
+    const d = await api('/api/admin/withdrawals?status=pending');
     const list = document.getElementById('withdraw-list');
-    if (!d.ok || !d.withdrawals.length) {
-      list.innerHTML = '<div class="empty-state">No pending withdrawals</div>';
-      return;
-    }
+    if (!d.ok || !d.withdrawals.length) { list.innerHTML = '<div class="empty-state">No pending withdrawals</div>'; return; }
     list.innerHTML = d.withdrawals.map(w => `
       <div class="row-card">
-        <div class="row-top">
-          <span class="row-amount">${fmt(w.amount)}</span>
-          <span class="row-sub">${w.created_at}</span>
-        </div>
-        <div class="row-sub">${w.phone} ${w.nick ? '· ' + w.nick : ''}</div>
+        <div class="row-top"><span class="row-amount">${fmt(w.amount)}</span><span class="row-sub">${w.created_at}</span></div>
+        <div class="row-sub">${esc(w.phone)} ${w.nick ? '· ' + esc(w.nick) : ''}</div>
         <div class="row-actions">
           <button class="act-btn act-approve" onclick="processWithdrawal(${w.id}, 'approve')">Approve</button>
           <button class="act-btn act-reject" onclick="processWithdrawal(${w.id}, 'reject')">Reject & Refund</button>
@@ -275,47 +339,360 @@
       </div>
     `).join('');
   }
-
   window.processWithdrawal = async function (id, action) {
-    const r = await fetch(`/api/admin/withdrawals/${id}/${action}`, { method: 'POST' });
-    const d = await r.json();
+    const d = await api(`/api/admin/withdrawals/${id}/${action}`, { method: 'POST' });
     if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
     toast(action === 'approve' ? '✅ Approved' : '↩️ Rejected & refunded');
-    loadWithdrawals();
-    loadStats();
+    loadWithdrawals(); loadStats();
   };
 
-  // ── Users ─────────────────────────────────────────────────────────────────
+  /* ══════════════════════ USERS ══════════════════════ */
   async function loadUsers(search) {
     const url = search ? `/api/admin/users?search=${encodeURIComponent(search)}` : '/api/admin/users';
-    const r = await fetch(url);
-    const d = await r.json();
+    const d = await api(url);
     const list = document.getElementById('user-list');
-    if (!d.ok || !d.users.length) {
-      list.innerHTML = '<div class="empty-state">No users found</div>';
-      return;
-    }
+    if (!d.ok || !d.users.length) { list.innerHTML = '<div class="empty-state">No users found</div>'; return; }
     list.innerHTML = d.users.map(u => `
-      <div class="row-card">
-        <div class="row-top">
-          <span class="row-amount">${fmt(u.balance)}</span>
-          <span class="row-sub">Joined ${u.created_at}</span>
-        </div>
-        <div class="row-sub">${u.phone} ${u.nick ? '· ' + u.nick : ''} · VIP ${u.vip_level}</div>
+      <div class="row-card" onclick="openUserDetail(${u.id})" style="cursor:pointer">
+        <div class="row-top"><span class="row-amount">${fmt(u.balance)}</span><span class="row-sub">Joined ${u.created_at}</span></div>
+        <div class="row-sub">${esc(u.phone)} ${u.nick ? '· ' + esc(u.nick) : ''} · VIP ${u.vip_level}</div>
         <div class="row-sub">Deposited ${fmt(u.total_deposit)} · Withdrawn ${fmt(u.total_withdraw)} · AI income ${fmt(u.ai_income)} · ${u.invite_count} invites</div>
       </div>
     `).join('');
   }
-
   let searchTimer = null;
   document.getElementById('user-search').addEventListener('input', (e) => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => loadUsers(e.target.value.trim()), 300);
   });
 
+  const USER_FIELD_LABELS = {
+    phone: 'Phone', nick: 'Nickname', email: 'Email', vip_level: 'VIP Level',
+    balance: 'Balance', wallet: 'Wallet', total_deposit: 'Total Deposit',
+    total_withdraw: 'Total Withdraw', ai_income: 'AI Income', today_earnings: "Today's Earnings",
+    team_income: 'Team Income', invite_count: 'Invite Count', team_count: 'Team Count',
+    raffle_ready: 'Raffle Tickets', last_salary: 'Last Salary', this_salary: 'This Salary',
+  };
+
+  window.openUserDetail = async function (userId) {
+    document.getElementById('user-overlay').classList.add('open');
+    document.getElementById('user-overlay-body').innerHTML = '<div class="empty-state">Loading…</div>';
+    const d = await api(`/api/admin/users/${userId}`);
+    if (!d.ok) { document.getElementById('user-overlay-body').innerHTML = '<div class="empty-state">Could not load user</div>'; return; }
+
+    const u = d.user;
+    document.getElementById('user-overlay-title').textContent = u.nick || u.phone;
+
+    const fieldsHtml = Object.entries(USER_FIELD_LABELS).map(([key, label]) => `
+      <div class="form-field">
+        <label>${label}</label>
+        <input data-field="${key}" value="${esc(u[key])}">
+      </div>
+    `).join('');
+
+    const machinesHtml = d.machines.length ? d.machines.map(m => `
+      <div class="row-card">
+        <div class="row-top">
+          <span style="color:var(--cyan);font-weight:700">${esc(m.machine_id)}</span>
+          <span class="status-pill pill-${m.status}">${m.status}</span>
+        </div>
+        <div class="row-sub">Bought ${m.bought_at} · Expires ${m.expires_at || '—'}</div>
+        <div class="form-grid" style="margin-top:8px">
+          <div class="form-field"><label>Daily Income</label><input data-um-field="daily_income" data-um-id="${m.id}" value="${m.daily_income}"></div>
+          <div class="form-field"><label>Total Income</label><input data-um-field="total_income" data-um-id="${m.id}" value="${m.total_income}"></div>
+          <div class="form-field"><label>Earned</label><input data-um-field="earned" data-um-id="${m.id}" value="${m.earned}"></div>
+          <div class="form-field">
+            <label>Status</label>
+            <select data-um-field="status" data-um-id="${m.id}">
+              <option value="running" ${m.status === 'running' ? 'selected' : ''}>running</option>
+              <option value="expired" ${m.status === 'expired' ? 'selected' : ''}>expired</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-secondary" style="width:100%" onclick="saveUserMachine(${m.id})">Save Machine</button>
+      </div>
+    `).join('') : '<div class="empty-state">No machines purchased</div>';
+
+    const txHtml = d.transactions.length ? d.transactions.map(t => `
+      <div class="row-sub" style="padding:4px 0;border-bottom:1px solid var(--border)">
+        ${t.created_at} · <b style="color:${t.amount >= 0 ? '#44ee88' : '#ee4444'}">${t.amount >= 0 ? '+' : ''}${fmt(t.amount)}</b> · ${esc(t.type)} ${t.note ? '— ' + esc(t.note) : ''}
+      </div>
+    `).join('') : '<div class="empty-state">No transactions</div>';
+
+    document.getElementById('user-overlay-body').innerHTML = `
+      <div class="sub-heading">Edit Fields</div>
+      ${fieldsHtml}
+      <div class="form-actions">
+        <button class="btn-primary" onclick="saveUserFields(${u.id})">Save Changes</button>
+      </div>
+
+      <div class="divider"></div>
+      <div class="sub-heading">Adjust Balance</div>
+      <div class="mini-note">Goes through the ledger (recommended over editing Balance directly above)</div>
+      <div class="form-grid">
+        <div class="form-field"><label>Amount (+/-)</label><input id="adj-amount" placeholder="e.g. 5000 or -2000"></div>
+        <div class="form-field"><label>Note</label><input id="adj-note" placeholder="Reason"></div>
+      </div>
+      <div class="form-actions"><button class="btn-primary" onclick="adjustBalance(${u.id})">Apply Adjustment</button></div>
+
+      <div class="divider"></div>
+      <div class="sub-heading">Reset Password</div>
+      <div class="form-field"><input id="reset-pw" type="text" placeholder="New password"></div>
+      <div class="form-actions"><button class="btn-secondary" onclick="resetUserPassword(${u.id})">Reset Password</button></div>
+
+      <div class="divider"></div>
+      <div class="sub-heading">Machines (${d.machines.length})</div>
+      ${machinesHtml}
+
+      <div class="divider"></div>
+      <div class="sub-heading">Recent Transactions</div>
+      ${txHtml}
+
+      <div class="divider"></div>
+      <div class="form-actions"><button class="btn-danger" onclick="deleteUser(${u.id})">Delete User Permanently</button></div>
+    `;
+  };
+  document.getElementById('user-overlay-close').addEventListener('click', () => { closeOverlays(); loadUsers(); loadStats(); });
+
+  window.saveUserFields = async function (userId) {
+    const updates = {};
+    document.querySelectorAll('#user-overlay-body [data-field]').forEach(el => { updates[el.dataset.field] = el.value; });
+    const d = await api(`/api/admin/users/${userId}`, { method: 'PATCH', body: JSON.stringify(updates) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Save failed')); return; }
+    toast('✅ Saved'); loadStats();
+  };
+
+  window.saveUserMachine = async function (umId) {
+    const updates = {};
+    document.querySelectorAll(`[data-um-id="${umId}"]`).forEach(el => { updates[el.dataset.umField] = el.value; });
+    const d = await api(`/api/admin/user-machines/${umId}`, { method: 'PATCH', body: JSON.stringify(updates) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Save failed')); return; }
+    toast('✅ Machine updated');
+  };
+
+  window.adjustBalance = async function (userId) {
+    const amount = document.getElementById('adj-amount').value.trim();
+    const note = document.getElementById('adj-note').value.trim();
+    const d = await api(`/api/admin/users/${userId}/adjust-balance`, { method: 'POST', body: JSON.stringify({ amount, note }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Balance adjusted');
+    openUserDetail(userId); loadStats();
+  };
+
+  window.resetUserPassword = async function (userId) {
+    const new_password = document.getElementById('reset-pw').value;
+    const d = await api(`/api/admin/users/${userId}/reset-password`, { method: 'POST', body: JSON.stringify({ new_password }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Password reset — user logged out everywhere');
+    document.getElementById('reset-pw').value = '';
+  };
+
+  window.deleteUser = async function (userId) {
+    if (!confirm('Permanently delete this user and all their data? This cannot be undone.')) return;
+    const d = await api(`/api/admin/users/${userId}`, { method: 'DELETE' });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ User deleted');
+    closeOverlays(); loadUsers(); loadStats();
+  };
+
+  /* ══════════════════════ MACHINES ══════════════════════ */
+  async function loadMachines() {
+    const d = await api('/api/admin/machines');
+    const list = document.getElementById('machine-list');
+    if (!d.ok || !d.machines.length) { list.innerHTML = '<div class="empty-state">No machines yet</div>'; return; }
+    list.innerHTML = d.machines.map(m => `
+      <div class="row-card">
+        <div class="row-top">
+          <span style="color:var(--cyan);font-weight:700">${esc(m.id)}</span>
+          <span class="status-pill ${m.sold ? 'pill-failed' : 'pill-successful'}">${m.sold ? 'Sold out' : 'In shop'}</span>
+        </div>
+        <div class="form-grid" style="margin-top:8px">
+          <div class="form-field"><label>Series</label><input data-mf="series" data-mid="${m.id}" value="${esc(m.series)}"></div>
+          <div class="form-field"><label>Price</label><input data-mf="price" data-mid="${m.id}" value="${m.price}"></div>
+          <div class="form-field"><label>Total Income</label><input data-mf="income" data-mid="${m.id}" value="${m.income}"></div>
+          <div class="form-field"><label>Lock Days</label><input data-mf="lock" data-mid="${m.id}" value="${m.lock}"></div>
+          <div class="form-field" style="grid-column:1/-1"><label>Image URL</label><input data-mf="image_url" data-mid="${m.id}" value="${esc(m.image_url || '')}"></div>
+          <div class="form-field">
+            <label>Sold Out</label>
+            <select data-mf="sold" data-mid="${m.id}">
+              <option value="0" ${!m.sold ? 'selected' : ''}>No — in shop</option>
+              <option value="1" ${m.sold ? 'selected' : ''}>Yes — retired</option>
+            </select>
+          </div>
+        </div>
+        <div class="row-actions">
+          <button class="act-btn act-neutral" onclick="saveMachine('${m.id}')">Save</button>
+          <button class="act-btn act-reject" onclick="deleteMachine('${m.id}')">Delete</button>
+        </div>
+      </div>
+    `).join('');
+  }
+  window.saveMachine = async function (id) {
+    const updates = {};
+    document.querySelectorAll(`[data-mid="${id}"]`).forEach(el => { updates[el.dataset.mf] = el.value; });
+    const d = await api(`/api/admin/machines/${id}`, { method: 'PATCH', body: JSON.stringify(updates) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Save failed')); return; }
+    toast('✅ Machine saved'); loadMachines();
+  };
+  window.deleteMachine = async function (id) {
+    if (!confirm(`Delete machine "${id}"? This only works if no user owns one.`)) return;
+    const d = await api(`/api/admin/machines/${id}`, { method: 'DELETE' });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Deleted'); loadMachines();
+  };
+
+  window.openAddMachine = function () {
+    document.getElementById('form-overlay-title').textContent = 'Add Machine';
+    document.getElementById('form-overlay-body').innerHTML = `
+      <div class="form-field"><label>ID (e.g. "A4")</label><input id="nm-id"></div>
+      <div class="form-grid">
+        <div class="form-field"><label>Series</label><input id="nm-series" value="A"></div>
+        <div class="form-field"><label>Price</label><input id="nm-price"></div>
+        <div class="form-field"><label>Total Income</label><input id="nm-income"></div>
+        <div class="form-field"><label>Lock Days</label><input id="nm-lock" value="30"></div>
+      </div>
+      <div class="form-field"><label>Image URL</label><input id="nm-image"></div>
+      <div class="form-actions"><button class="btn-primary" onclick="submitAddMachine()">Create Machine</button></div>
+    `;
+    document.getElementById('form-overlay').classList.add('open');
+  };
+  window.submitAddMachine = async function () {
+    const body = {
+      id: document.getElementById('nm-id').value.trim(),
+      series: document.getElementById('nm-series').value.trim() || 'A',
+      price: document.getElementById('nm-price').value,
+      income: document.getElementById('nm-income').value,
+      lock: document.getElementById('nm-lock').value,
+      image_url: document.getElementById('nm-image').value.trim(),
+    };
+    const d = await api('/api/admin/machines', { method: 'POST', body: JSON.stringify(body) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Machine created'); closeOverlays(); loadMachines();
+  };
+
+  /* ══════════════════════ DEPOSITS ══════════════════════ */
+  async function loadDeposits() {
+    const d = await api('/api/admin/deposits');
+    const list = document.getElementById('deposit-list');
+    if (!d.ok || !d.deposits.length) { list.innerHTML = '<div class="empty-state">No deposits yet</div>'; return; }
+    list.innerHTML = d.deposits.map(dep => `
+      <div class="row-card">
+        <div class="row-top">
+          <span class="row-amount">${fmt(dep.amount)}</span>
+          <span class="status-pill pill-${dep.status}">${dep.status}</span>
+        </div>
+        <div class="row-sub">${esc(dep.phone)} ${dep.nick ? '· ' + esc(dep.nick) : ''} · ${dep.network || ''}</div>
+        <div class="row-sub">${dep.created_at} · ref ${esc(dep.tx_ref)}</div>
+        <div class="row-actions">
+          <select data-dep-id="${dep.id}" style="flex:1;padding:8px;border-radius:8px;background:#041220;border:1px solid var(--border);color:#fff;font-size:12px">
+            <option value="pending" ${dep.status === 'pending' ? 'selected' : ''}>pending</option>
+            <option value="successful" ${dep.status === 'successful' ? 'selected' : ''}>successful</option>
+            <option value="failed" ${dep.status === 'failed' ? 'selected' : ''}>failed</option>
+          </select>
+          <button class="act-btn act-neutral" onclick="saveDepositStatus(${dep.id})">Update Status</button>
+        </div>
+      </div>
+    `).join('');
+  }
+  window.saveDepositStatus = async function (id) {
+    const status = document.querySelector(`[data-dep-id="${id}"]`).value;
+    const d = await api(`/api/admin/deposits/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Status updated'); loadDeposits(); loadStats();
+  };
+
+  /* ══════════════════════ MANAGERS ══════════════════════ */
+  async function loadManagers() {
+    const d = await api('/api/admin/admins');
+    const list = document.getElementById('manager-list');
+    if (!d.ok || !d.admins.length) { list.innerHTML = '<div class="empty-state">No managers found</div>'; return; }
+    list.innerHTML = d.admins.map(a => `
+      <div class="row-card">
+        <div class="row-top">
+          <span style="font-weight:700;color:#fff">${esc(a.name)} ${a.is_you ? '<span style="color:var(--cyan);font-size:11px">(you)</span>' : ''}</span>
+          <span class="row-sub">Added ${a.created_at}</span>
+        </div>
+        <div class="row-sub">@${esc(a.username)}</div>
+        ${!a.is_you ? `<div class="row-actions"><button class="act-btn act-reject" onclick="removeManager(${a.id})">Remove</button></div>` : ''}
+      </div>
+    `).join('');
+  }
+  window.removeManager = async function (id) {
+    if (!confirm('Remove this manager account?')) return;
+    const d = await api(`/api/admin/admins/${id}`, { method: 'DELETE' });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Manager removed'); loadManagers();
+  };
+
+  window.openAddManager = function () {
+    document.getElementById('form-overlay-title').textContent = 'Add Manager';
+    document.getElementById('form-overlay-body').innerHTML = `
+      <div class="form-field"><label>Display Name</label><input id="am-name" placeholder="e.g. Sarah"></div>
+      <div class="form-field"><label>Username</label><input id="am-username"></div>
+      <div class="form-field"><label>Password</label><input id="am-password" type="text" placeholder="At least 8 characters"></div>
+      <div class="form-actions"><button class="btn-primary" onclick="submitAddManager()">Create Manager</button></div>
+    `;
+    document.getElementById('form-overlay').classList.add('open');
+  };
+  window.submitAddManager = async function () {
+    const body = {
+      name: document.getElementById('am-name').value.trim(),
+      username: document.getElementById('am-username').value.trim(),
+      password: document.getElementById('am-password').value,
+    };
+    const d = await api('/api/admin/admins', { method: 'POST', body: JSON.stringify(body) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Manager created'); closeOverlays(); loadManagers();
+  };
+
+  /* ══════════════════════ ANNOUNCEMENTS ══════════════════════ */
+  async function loadAnnouncements() {
+    const d = await api('/api/admin/announcements');
+    const list = document.getElementById('announcement-list');
+    if (!d.ok || !d.announcements.length) { list.innerHTML = '<div class="empty-state">No announcements yet</div>'; return; }
+    list.innerHTML = d.announcements.map(a => `
+      <div class="row-card">
+        <div class="form-field"><textarea data-ann-id="${a.id}" rows="2">${esc(a.text)}</textarea></div>
+        <div class="row-sub">Posted ${a.created_at}</div>
+        <div class="row-actions">
+          <button class="act-btn act-neutral" onclick="saveAnnouncement(${a.id})">Save</button>
+          <button class="act-btn act-reject" onclick="deleteAnnouncement(${a.id})">Delete</button>
+        </div>
+      </div>
+    `).join('');
+  }
+  window.saveAnnouncement = async function (id) {
+    const text = document.querySelector(`[data-ann-id="${id}"]`).value.trim();
+    const d = await api(`/api/admin/announcements/${id}`, { method: 'PATCH', body: JSON.stringify({ text }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Saved'); loadAnnouncements();
+  };
+  window.deleteAnnouncement = async function (id) {
+    if (!confirm('Delete this announcement?')) return;
+    const d = await api(`/api/admin/announcements/${id}`, { method: 'DELETE' });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Deleted'); loadAnnouncements();
+  };
+  window.openAddAnnouncement = function () {
+    document.getElementById('form-overlay-title').textContent = 'New Announcement';
+    document.getElementById('form-overlay-body').innerHTML = `
+      <div class="form-field"><label>Text</label><textarea id="na-text" rows="4"></textarea></div>
+      <div class="form-actions"><button class="btn-primary" onclick="submitAddAnnouncement()">Post</button></div>
+    `;
+    document.getElementById('form-overlay').classList.add('open');
+  };
+  window.submitAddAnnouncement = async function () {
+    const text = document.getElementById('na-text').value.trim();
+    const d = await api('/api/admin/announcements', { method: 'POST', body: JSON.stringify({ text }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Posted'); closeOverlays(); loadAnnouncements();
+  };
+
+  /* ══════════════════════ Overlay close wiring ══════════════════════ */
+  document.getElementById('form-overlay-close').addEventListener('click', closeOverlays);
+
   // Light polling so new messages/withdrawals show up without a manual refresh.
   setInterval(() => { loadStats(); loadConversations(); loadWithdrawals(); }, 10000);
 </script>
 </body>
-  </html>
-  
+</html>
