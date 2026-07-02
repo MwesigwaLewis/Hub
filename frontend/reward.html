@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Future AI Hub — Redeem Reward</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    .redeem-card {
+      margin: 20px 12px; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 24px 20px; text-align: center;
+    }
+    .redeem-icon { font-size: 40px; margin-bottom: 10px; }
+    .redeem-title { font-size: 17px; font-weight: 800; color: #fff; margin-bottom: 4px; }
+    .redeem-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 20px; }
+    .redeem-input {
+      width: 100%; padding: 14px; border-radius: 10px; background: #041220;
+      border: 1.5px solid var(--border); color: #fff; font-size: 18px; font-weight: 700;
+      text-align: center; letter-spacing: 2px; text-transform: uppercase; box-sizing: border-box;
+      font-family: inherit;
+    }
+    .redeem-input:focus { outline: none; border-color: var(--cyan); }
+    .redeem-btn {
+      width: 100%; margin-top: 14px; padding: 14px; border: none; border-radius: 10px;
+      background: var(--cyan); color: #04121c; font-weight: 700; font-size: 15px; cursor: pointer;
+    }
+    .redeem-btn:disabled { opacity: 0.6; }
+
+    .history-head { padding: 4px 14px 8px; font-size: 13px; font-weight: 700; color: var(--cyan); text-transform: uppercase; letter-spacing: 0.5px; }
+    .history-row {
+      margin: 0 12px 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .history-code { font-weight: 700; color: #fff; font-size: 13px; }
+    .history-desc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .history-amount { color: #44ee88; font-weight: 800; font-size: 14px; }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="page">
+  <div class="app-bar">
+    <a href="my.html" class="back-btn">‹</a>
+    <span class="app-bar-title">Redeem Reward</span>
+    <span style="width:40px"></span>
+  </div>
+
+  <div class="scroll-area">
+    <div class="redeem-card">
+      <div class="redeem-icon">🎁</div>
+      <div class="redeem-title">Have a reward code?</div>
+      <div class="redeem-sub">Enter it below to claim your reward</div>
+      <input class="redeem-input" id="code-input" placeholder="CODE" maxlength="20" autocapitalize="characters">
+      <button class="redeem-btn" id="redeem-btn">Redeem</button>
+    </div>
+
+    <div class="history-head">Redemption History</div>
+    <div id="history-list"><div class="empty-state"><div class="empty-icon">🎁</div>No rewards redeemed yet</div></div>
+  </div>
+
+  <nav class="bottom-nav" id="bottom-nav"></nav>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/nav.js"></script>
+<script>
+  renderNav('my');
+  const fmt = n => parseFloat(n || 0).toLocaleString();
+
+  async function loadHistory() {
+    try {
+      const r = await fetch('/api/rewards/history');
+      const d = await r.json();
+      if (!d.ok) return;
+      const list = document.getElementById('history-list');
+      if (!d.history.length) return;
+      list.innerHTML = d.history.map(h => `
+        <div class="history-row">
+          <div>
+            <div class="history-code">${h.code}</div>
+            <div class="history-desc">${h.description || ''} · ${h.redeemed_at}</div>
+          </div>
+          <div class="history-amount">+${fmt(h.amount)}</div>
+        </div>
+      `).join('');
+    } catch (e) {}
+  }
+
+  async function redeem() {
+    const code = document.getElementById('code-input').value.trim();
+    if (!code) { toast('Enter a code first'); return; }
+    const btn = document.getElementById('redeem-btn');
+    btn.disabled = true;
+    try {
+      const r = await fetch('/api/rewards/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const d = await r.json();
+      if (!d.ok) { toast('❌ ' + (d.error || 'Could not redeem code')); return; }
+      toast(`✅ Redeemed! +${fmt(d.amount)} added to your balance`);
+      document.getElementById('code-input').value = '';
+      loadHistory();
+    } catch (e) {
+      toast('❌ Network error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('redeem-btn').addEventListener('click', redeem);
+  document.getElementById('code-input').addEventListener('keydown', e => { if (e.key === 'Enter') redeem(); });
+
+  loadHistory();
+</script>
+</body>
+  </html>
