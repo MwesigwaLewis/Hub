@@ -128,6 +128,7 @@
   <div class="tab-btn" data-tab="deposits">Deposits</div>
   <div class="tab-btn" data-tab="managers">Managers</div>
   <div class="tab-btn" data-tab="announcements">Announcements</div>
+  <div class="tab-btn" data-tab="rewards">Reward Codes</div>
 </div>
 
 <!-- INBOX -->
@@ -176,6 +177,15 @@
     <button class="add-btn" onclick="openAddAnnouncement()">+ New</button>
   </div>
   <div id="announcement-list"><div class="empty-state">Loading…</div></div>
+</div>
+
+<!-- REWARD CODES -->
+<div class="tab-panel" id="panel-rewards">
+  <div class="section-head">
+    <h3>Reward Codes</h3>
+    <button class="add-btn" onclick="openAddRewardCode()">+ Create Code</button>
+  </div>
+  <div id="reward-code-list"><div class="empty-state">Loading…</div></div>
 </div>
 </div>
 
@@ -246,7 +256,7 @@
 
   function refreshAll() {
     loadStats(); loadConversations(); loadWithdrawals();
-    loadUsers(); loadMachines(); loadDeposits(); loadManagers(); loadAnnouncements();
+    loadUsers(); loadMachines(); loadDeposits(); loadManagers(); loadAnnouncements(); loadRewardCodes();
   }
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
@@ -368,6 +378,7 @@
 
   const USER_FIELD_LABELS = {
     phone: 'Phone', nick: 'Nickname', email: 'Email', vip_level: 'VIP Level',
+    depositing_invites: 'Depositing Invites (drives VIP level)',
     balance: 'Balance', wallet: 'Wallet', total_deposit: 'Total Deposit',
     total_withdraw: 'Total Withdraw', ai_income: 'AI Income', today_earnings: "Today's Earnings",
     team_income: 'Team Income', invite_count: 'Invite Count', team_count: 'Team Count',
@@ -686,6 +697,86 @@
     const d = await api('/api/admin/announcements', { method: 'POST', body: JSON.stringify({ text }) });
     if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
     toast('✅ Posted'); closeOverlays(); loadAnnouncements();
+  };
+
+  /* ══════════════════════ REWARD CODES ══════════════════════ */
+  function rewardCodeStatus(rc) {
+    const now = new Date();
+    if (!rc.active) return { label: 'disabled', cls: 'pill-failed' };
+    if (now < new Date(rc.valid_from)) return { label: 'upcoming', cls: 'pill-pending' };
+    if (now > new Date(rc.valid_until)) return { label: 'expired', cls: 'pill-expired' };
+    return { label: 'active', cls: 'pill-successful' };
+  }
+
+  async function loadRewardCodes() {
+    const d = await api('/api/admin/reward-codes');
+    const list = document.getElementById('reward-code-list');
+    if (!d.ok || !d.reward_codes.length) { list.innerHTML = '<div class="empty-state">No reward codes yet</div>'; return; }
+    list.innerHTML = d.reward_codes.map(rc => {
+      const st = rewardCodeStatus(rc);
+      return `
+        <div class="row-card">
+          <div class="row-top">
+            <span style="color:var(--cyan);font-weight:800;font-size:15px;letter-spacing:1px">${esc(rc.code)}</span>
+            <span class="status-pill ${st.cls}">${st.label}</span>
+          </div>
+          <div class="row-sub">Reward: <b style="color:#44ee88">${fmt(rc.amount)}</b> each · ${rc.redemption_count} redemption${rc.redemption_count == 1 ? '' : 's'}</div>
+          ${rc.description ? `<div class="row-sub">${esc(rc.description)}</div>` : ''}
+          <div class="row-sub">Valid ${rc.valid_from.replace('T', ' ')} → ${rc.valid_until.replace('T', ' ')}</div>
+          <div class="row-actions">
+            <button class="act-btn act-neutral" onclick="toggleRewardCode(${rc.id}, ${!rc.active})">${rc.active ? 'Disable' : 'Enable'}</button>
+            <button class="act-btn act-reject" onclick="deleteRewardCode(${rc.id})">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  window.toggleRewardCode = async function (id, newActive) {
+    const d = await api(`/api/admin/reward-codes/${id}`, { method: 'PATCH', body: JSON.stringify({ active: newActive }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast(newActive ? '✅ Enabled' : '⏸️ Disabled'); loadRewardCodes();
+  };
+  window.deleteRewardCode = async function (id) {
+    if (!confirm('Delete this reward code? Past redemption history for it will also be removed.')) return;
+    const d = await api(`/api/admin/reward-codes/${id}`, { method: 'DELETE' });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Deleted'); loadRewardCodes();
+  };
+
+  function defaultDateTimeLocal(offsetDays) {
+    const d = new Date(Date.now() + offsetDays * 86400000);
+    d.setSeconds(0, 0);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  }
+
+  window.openAddRewardCode = function () {
+    document.getElementById('form-overlay-title').textContent = 'Create Reward Code';
+    document.getElementById('form-overlay-body').innerHTML = `
+      <div class="form-field"><label>Code (leave blank to auto-generate)</label><input id="rc-code" style="text-transform:uppercase"></div>
+      <div class="form-field"><label>Reward Amount (per user)</label><input id="rc-amount"></div>
+      <div class="form-field"><label>Description (optional)</label><input id="rc-desc" placeholder="e.g. New Year Bonus"></div>
+      <div class="form-grid">
+        <div class="form-field"><label>Valid From</label><input id="rc-from" type="datetime-local" value="${defaultDateTimeLocal(0)}"></div>
+        <div class="form-field"><label>Valid Until</label><input id="rc-until" type="datetime-local" value="${defaultDateTimeLocal(7)}"></div>
+      </div>
+      <div class="mini-note">Any number of different users can redeem this code, each only once, only while it's within this window.</div>
+      <div class="form-actions"><button class="btn-primary" onclick="submitAddRewardCode()">Create Code</button></div>
+    `;
+    document.getElementById('form-overlay').classList.add('open');
+  };
+  window.submitAddRewardCode = async function () {
+    const body = {
+      code: document.getElementById('rc-code').value.trim(),
+      amount: document.getElementById('rc-amount').value,
+      description: document.getElementById('rc-desc').value.trim(),
+      valid_from: document.getElementById('rc-from').value,
+      valid_until: document.getElementById('rc-until').value,
+    };
+    const d = await api('/api/admin/reward-codes', { method: 'POST', body: JSON.stringify(body) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast(`✅ Code "${d.code}" created`); closeOverlays(); loadRewardCodes();
   };
 
   /* ══════════════════════ Overlay close wiring ══════════════════════ */
