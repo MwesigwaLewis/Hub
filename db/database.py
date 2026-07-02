@@ -106,7 +106,8 @@ def init_db():
             nick           TEXT NOT NULL DEFAULT 'Anon',
             avatar_url     TEXT,
             email          TEXT,
-            vip_level      INTEGER NOT NULL DEFAULT 1,
+            vip_level      INTEGER NOT NULL DEFAULT 0,
+            depositing_invites INTEGER NOT NULL DEFAULT 0,
             balance        DOUBLE PRECISION NOT NULL DEFAULT 0.0,
             wallet         DOUBLE PRECISION NOT NULL DEFAULT 0.0,
             total_deposit  DOUBLE PRECISION NOT NULL DEFAULT 0.0,
@@ -316,6 +317,10 @@ def init_db():
         print(f"[DB] Seeded default admin '{default_user}'. "
               f"{'Using ADMIN_PASSWORD from env.' if os.environ.get('ADMIN_PASSWORD') else '⚠️  Using default password changeme123 — log in at /admin/login.html and change it immediately.'}")
 
+    # ── Migrations for databases created before this column/default existed ──
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS depositing_invites INTEGER NOT NULL DEFAULT 0")
+    cur.execute("ALTER TABLE users ALTER COLUMN vip_level SET DEFAULT 0")
+
     # ── Indexes ───────────────────────────────────────────────────────────────
     # These columns are hit on essentially every request (session check on
     # every page load, my-machines / team / transaction history lookups) but
@@ -337,5 +342,6 @@ def init_db():
     cur.close()
     conn.close()
     print("[DB] All tables ready (Supabase/Postgres).")
+
 
     
