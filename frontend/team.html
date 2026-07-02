@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Future AI Hub — My Team</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    .level-head {
+      padding: 14px 12px 6px;
+      font-size: 13px; font-weight: 700;
+      color: var(--cyan); letter-spacing: 0.5px;
+      text-transform: uppercase;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .level-count { color: var(--text-muted); font-weight: 600; }
+
+    .member-card {
+      margin: 0 10px 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .member-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .member-phone { font-size: 14px; font-weight: 700; color: #fff; }
+    .member-joined { font-size: 11px; color: var(--text-muted); }
+    .member-machines { padding: 8px 14px 12px; }
+    .machine-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 0; font-size: 13px;
+    }
+    .machine-name { color: var(--cyan); font-weight: 600; }
+    .machine-price { color: #8aaabb; }
+    .machine-badge {
+      font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px;
+    }
+    .badge-running { background: #003322; color: #44ee88; border: 1px solid #33cc66; }
+    .badge-expired { background: #220011; color: #ee4444; border: 1px solid #cc3333; }
+    .no-machines { color: #3a5a7a; font-size: 12px; padding: 10px 14px; }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="page">
+  <div class="app-bar">
+    <a href="my.html" class="back-btn">‹</a>
+    <span class="app-bar-title">My Team</span>
+    <span style="width:40px"></span>
+  </div>
+
+  <div class="scroll-area">
+    <div class="level-head">Level 1 <span class="level-count" id="l1-count">0</span></div>
+    <div id="level1-list"><div class="empty-state"><div class="empty-icon">👥</div>No direct invites yet</div></div>
+
+    <div class="level-head" style="margin-top:8px">Level 2 <span class="level-count" id="l2-count">0</span></div>
+    <div id="level2-list"><div class="empty-state"><div class="empty-icon">👥</div>No level-2 invites yet</div></div>
+  </div>
+
+  <nav class="bottom-nav" id="bottom-nav"></nav>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/nav.js"></script>
+<script>
+  renderNav('my');
+
+  const fmt = n => parseFloat(n || 0).toLocaleString();
+
+  function renderMember(m) {
+    const machinesHtml = m.machines.length
+      ? m.machines.map(mc => `
+          <div class="machine-row">
+            <span class="machine-name">${mc.machine_id}</span>
+            <span class="machine-price">${fmt(mc.purchase_price)}</span>
+            <span class="machine-badge ${mc.status === 'running' ? 'badge-running' : 'badge-expired'}">
+              ${mc.status === 'running' ? 'Running' : 'Expired'}
+            </span>
+          </div>
+        `).join('')
+      : `<div class="no-machines">No machines purchased yet</div>`;
+
+    return `
+      <div class="member-card">
+        <div class="member-head">
+          <span class="member-phone">${m.phone}</span>
+          <span class="member-joined">Joined ${m.joined || '—'}</span>
+        </div>
+        <div class="member-machines">${machinesHtml}</div>
+      </div>
+    `;
+  }
+
+  async function loadTeam() {
+    try {
+      const r = await fetch('/api/team');
+      const d = await r.json();
+      if (!d.ok) { window.location.href = 'index.html'; return; }
+
+      document.getElementById('l1-count').textContent = d.level1.length;
+      document.getElementById('l2-count').textContent = d.level2.length;
+
+      if (d.level1.length) {
+        document.getElementById('level1-list').innerHTML = d.level1.map(renderMember).join('');
+      }
+      if (d.level2.length) {
+        document.getElementById('level2-list').innerHTML = d.level2.map(renderMember).join('');
+      }
+    } catch (e) {
+      toast('❌ Could not load your team');
+    }
+  }
+
+  loadTeam();
+</script>
+</body>
+</html>
