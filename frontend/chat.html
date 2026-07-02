@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Future AI Hub — Chat with Manager</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    .chat-page { display: flex; flex-direction: column; height: 100vh; }
+    .chat-scroll {
+      flex: 1; overflow-y: auto; padding: 12px 10px 8px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .bubble-row { display: flex; }
+    .bubble-row.mine { justify-content: flex-end; }
+    .bubble {
+      max-width: 78%;
+      padding: 10px 13px;
+      border-radius: 14px;
+      font-size: 14px; line-height: 1.4;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .bubble-row.theirs .bubble {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: #eaf6ff;
+      border-bottom-left-radius: 4px;
+    }
+    .bubble-row.mine .bubble {
+      background: var(--cyan);
+      color: #04121c;
+      font-weight: 500;
+      border-bottom-right-radius: 4px;
+    }
+    .bubble-time {
+      font-size: 10px; color: #3a5a7a; margin-top: 3px; padding: 0 4px;
+    }
+    .bubble-row.mine .bubble-time { text-align: right; }
+
+    .chat-input-bar {
+      display: flex; gap: 8px; align-items: flex-end;
+      padding: 10px; border-top: 1px solid var(--border);
+      background: var(--bg);
+      padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    }
+    .chat-input {
+      flex: 1; resize: none; max-height: 100px; min-height: 40px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 10px 16px; color: #fff; font-size: 14px;
+      font-family: inherit;
+    }
+    .chat-input:focus { outline: none; border-color: var(--cyan); }
+    .chat-send-btn {
+      width: 40px; height: 40px; border-radius: 50%; border: none;
+      background: var(--cyan); color: #04121c;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; cursor: pointer;
+    }
+    .chat-send-btn:active { transform: scale(0.92); }
+    .chat-send-btn svg { width: 18px; height: 18px; }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="page chat-page">
+  <div class="app-bar">
+    <a href="my.html" class="back-btn">‹</a>
+    <span class="app-bar-title">Manager</span>
+    <span style="width:40px"></span>
+  </div>
+
+  <div class="chat-scroll" id="chat-scroll">
+    <div class="empty-state" id="chat-empty">
+      <div class="empty-icon">💬</div>
+      Send a message and the manager will reply here
+    </div>
+  </div>
+
+  <div class="chat-input-bar">
+    <textarea class="chat-input" id="chat-input" placeholder="Message the manager…" rows="1"></textarea>
+    <button class="chat-send-btn" id="chat-send-btn" aria-label="Send">
+      <i data-lucide="send"></i>
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="assets/nav.js"></script>
+<script>
+  const scrollEl = document.getElementById('chat-scroll');
+  const emptyEl  = document.getElementById('chat-empty');
+  const input    = document.getElementById('chat-input');
+  const sendBtn  = document.getElementById('chat-send-btn');
+
+  let lastRenderedCount = 0;
+  let pollTimer = null;
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function renderMessages(messages) {
+    if (!messages.length) {
+      emptyEl.style.display = 'flex';
+      return;
+    }
+    emptyEl.style.display = 'none';
+
+    const wasAtBottom = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight < 60;
+
+    scrollEl.querySelectorAll('.bubble-row').forEach(el => el.remove());
+    messages.forEach(m => {
+      const row = document.createElement('div');
+      row.className = 'bubble-row ' + (m.sender === 'user' ? 'mine' : 'theirs');
+      row.innerHTML = `
+        <div>
+          <div class="bubble">${esc(m.body)}</div>
+          <div class="bubble-time">${m.sender === 'user' ? 'You' : 'Manager'} · ${m.created_at || ''}</div>
+        </div>
+      `;
+      scrollEl.appendChild(row);
+    });
+
+    if (wasAtBottom || messages.length !== lastRenderedCount) {
+      scrollEl.scrollTop = scrollEl.scrollHeight;
+    }
+    lastRenderedCount = messages.length;
+  }
+
+  async function loadMessages() {
+    try {
+      const r = await fetch('/api/chat/messages');
+      const d = await r.json();
+      if (!d.ok) { window.location.href = 'index.html'; return; }
+      renderMessages(d.messages);
+    } catch (e) { /* silent — keep polling */ }
+  }
+
+  async function sendMessage() {
+    const body = input.value.trim();
+    if (!body) return;
+    input.value = '';
+    input.style.height = 'auto';
+    sendBtn.disabled = true;
+    try {
+      const r = await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body }),
+      });
+      const d = await r.json();
+      if (!d.ok) { toast('❌ ' + (d.error || 'Could not send')); return; }
+      await loadMessages();
+    } catch (e) {
+      toast('❌ Network error');
+    } finally {
+      sendBtn.disabled = false;
+    }
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+  });
+
+  loadMessages();
+  pollTimer = setInterval(loadMessages, 4000);
+  window.addEventListener('beforeunload', () => clearInterval(pollTimer));
+</script>
+</body>
+</html>
