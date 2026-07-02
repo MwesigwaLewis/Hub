@@ -5,7 +5,8 @@
 const NAV_ICONS = {
   home:   'home',
   raffle: 'ticket',
-  ai:     'cpu',
+  chat: 'message-circle',
+  ai:     'microchip',
   income: 'wallet',
   my:     'user',
 };
