@@ -213,6 +213,40 @@ def init_db():
         )
     """)
 
+    # ── Admins (separate identity from regular users, on purpose — a manager
+    #    logging in should never be able to accidentally land in a customer
+    #    session or vice versa) ───────────────────────────────────────────────
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS admins (
+            id         SERIAL PRIMARY KEY,
+            username   TEXT NOT NULL UNIQUE,
+            password   TEXT NOT NULL,
+            name       TEXT NOT NULL DEFAULT 'Manager',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS admin_sessions (
+            token      TEXT PRIMARY KEY,
+            admin_id   INTEGER NOT NULL REFERENCES admins(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # ── Support chat: one thread per user, admin replies into the same thread ──
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id          SERIAL PRIMARY KEY,
+            user_id     INTEGER NOT NULL REFERENCES users(id),
+            sender      TEXT NOT NULL,                 -- 'user' or 'admin'
+            body        TEXT NOT NULL,
+            read_by_user  BOOLEAN NOT NULL DEFAULT FALSE,
+            read_by_admin BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # ── Messages / announcements ──────────────────────────────────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS messages (
@@ -266,6 +300,22 @@ def init_db():
         cur.execute("INSERT INTO messages (text) VALUES (%s)",
                     ('Welcome to Future AI Hub! Deposit via MTN or Airtel Mobile Money.',))
 
+    # ── Seed a default admin if the table is empty ─────────────────────────────
+    # There's no self-serve admin signup (by design — see routes/admin.py), so
+    # something has to create the first account. Override via env vars before
+    # first deploy; otherwise a default is created and logged so you notice it.
+    cur.execute("SELECT COUNT(*) FROM admins")
+    if cur.fetchone()[0] == 0:
+        from werkzeug.security import generate_password_hash
+        default_user = os.environ.get('ADMIN_USERNAME', 'admin')
+        default_pass = os.environ.get('ADMIN_PASSWORD', 'changeme123')
+        cur.execute(
+            "INSERT INTO admins (username, password, name) VALUES (%s, %s, %s)",
+            (default_user, generate_password_hash(default_pass), 'Manager')
+        )
+        print(f"[DB] Seeded default admin '{default_user}'. "
+              f"{'Using ADMIN_PASSWORD from env.' if os.environ.get('ADMIN_PASSWORD') else '⚠️  Using default password changeme123 — log in at /admin/login.html and change it immediately.'}")
+
     # ── Indexes ───────────────────────────────────────────────────────────────
     # These columns are hit on essentially every request (session check on
     # every page load, my-machines / team / transaction history lookups) but
@@ -280,9 +330,12 @@ def init_db():
     cur.execute("CREATE INDEX IF NOT EXISTS idx_deposit_tx_user_id ON deposit_transactions(user_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_withdraw_req_user_id ON withdraw_requests(user_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_raffle_records_user_id ON raffle_records(user_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON chat_messages(user_id, created_at)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin_id ON admin_sessions(admin_id)")
 
     conn.commit()
     cur.close()
     conn.close()
     print("[DB] All tables ready (Supabase/Postgres).")
+
     
