@@ -131,6 +131,16 @@ function showPanel(name) {
   document.getElementById('panel-register').classList.toggle('hidden', name !== 'register');
 }
 
+// Arrived via a shared invite link (my.html's Invite button generates
+// index.html?ref=CODE) — jump straight to Register with the code filled in.
+(function prefillInviteFromLink() {
+  const ref = new URLSearchParams(window.location.search).get('ref');
+  if (ref) {
+    document.getElementById('reg-invite').value = ref;
+    showPanel('register');
+  }
+})();
+
 function togglePw(id, btn) {
   const inp = document.getElementById(id);
   inp.type = inp.type === 'password' ? 'text' : 'password';
@@ -182,4 +192,5 @@ async function doRegister() {
 }
 </script>
 </body>
-</html>
+            </html>
+      
