@@ -1,6 +1,7 @@
 import os
 import psycopg
 from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 # Supabase gives you this under Project Settings -> Database -> Connection string.
 # Use the "Transaction pooler" URI (port 6543) in production so you don't run out
@@ -12,6 +13,25 @@ if not DATABASE_URL:
         "No database URL found. Set SUPABASE_DB_URL (or DATABASE_URL) in your .env — "
         "get it from your Supabase project: Settings -> Database -> Connection string."
     )
+
+# One connection pool per process, created once at import time and reused for
+# the life of the worker. Previously every request called psycopg.connect()
+# from scratch — a fresh TCP handshake + TLS negotiation + Postgres auth
+# round trip (commonly 200ms-1s+ against a remote DB) on every single API
+# call, twice per page load (once in middleware/auth.py to check the
+# session, once in the route itself). Pulling an already-open connection out
+# of this pool instead reduces that to an in-process handoff.
+#   min_size: connections kept warm at all times
+#   max_size: cap on how many concurrent DB connections one gunicorn worker
+#             can hold — keep this comfortably under your Postgres/pooler's
+#             connection limit if you run multiple workers
+_pool = ConnectionPool(
+    conninfo=DATABASE_URL,
+    min_size=1,
+    max_size=10,
+    kwargs={"sslmode": "require", "row_factory": dict_row},
+    open=True,
+)
 
 
 class _CursorWrapper:
@@ -32,9 +52,10 @@ class _CursorWrapper:
 
 
 class _ConnWrapper:
-    """Wraps a psycopg connection so existing route code — db.execute(...),
+    """Wraps a pooled psycopg connection so existing route code — db.execute(...),
     .fetchone()/.fetchall(), db.commit(), db.close() — keeps working unchanged.
-    Translates sqlite-style '?' placeholders to psycopg's '%s' automatically."""
+    Translates sqlite-style '?' placeholders to psycopg's '%s' automatically.
+    close() returns the connection to the pool instead of tearing it down."""
     def __init__(self, conn):
         self._conn = conn
 
@@ -50,13 +71,20 @@ class _ConnWrapper:
         self._conn.rollback()
 
     def close(self):
-        self._conn.close()
+        # Guard against handing back a connection mid-transaction (e.g. a
+        # route raised before calling commit()/rollback()) — rollback() on
+        # an already-clean connection is a harmless no-op.
+        try:
+            self._conn.rollback()
+        except Exception:
+            pass
+        _pool.putconn(self._conn)
 
 
 def get_db():
-    """Return a Supabase/Postgres connection wrapped to match the previous
+    """Return a pooled Postgres connection wrapped to match the previous
     sqlite3 interface used throughout the app (routes/*.py, middleware/auth.py)."""
-    conn = psycopg.connect(DATABASE_URL, sslmode='require')
+    conn = _pool.getconn()
     return _ConnWrapper(conn)
 
 
@@ -238,9 +266,23 @@ def init_db():
         cur.execute("INSERT INTO messages (text) VALUES (%s)",
                     ('Welcome to Future AI Hub! Deposit via MTN or Airtel Mobile Money.',))
 
+    # ── Indexes ───────────────────────────────────────────────────────────────
+    # These columns are hit on essentially every request (session check on
+    # every page load, my-machines / team / transaction history lookups) but
+    # had no index, meaning Postgres had to scan the whole table for each
+    # lookup as row counts grew. phone/invite_code/token already have
+    # implicit indexes from their UNIQUE/PRIMARY KEY constraints.
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_users_invited_by ON users(invited_by)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_machines_user_id ON user_machines(user_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_machines_user_status ON user_machines(user_id, status)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_deposit_tx_user_id ON deposit_transactions(user_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_withdraw_req_user_id ON withdraw_requests(user_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_raffle_records_user_id ON raffle_records(user_id)")
+
     conn.commit()
     cur.close()
     conn.close()
     print("[DB] All tables ready (Supabase/Postgres).")
-
     
