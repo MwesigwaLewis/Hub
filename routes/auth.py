@@ -1,15 +1,33 @@
 import secrets
 import hashlib
 from flask import Blueprint, request, jsonify, make_response
+from werkzeug.security import generate_password_hash, check_password_hash
 from db.database import get_db
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api')
 
+SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 days — matches the cookie's max_age
+
 def hash_password(pw):
-    return hashlib.sha256(pw.encode()).hexdigest()
+    """New passwords get a salted, slow hash instead of bare SHA-256."""
+    return generate_password_hash(pw)
+
+def verify_password(pw, stored_hash):
+    """
+    Accept either the new salted hash or a legacy unsalted-SHA256 hash left
+    over from before this fix, so existing accounts keep working.
+    """
+    if stored_hash.startswith(('scrypt:', 'pbkdf2:')):
+        return check_password_hash(stored_hash, pw)
+    return hashlib.sha256(pw.encode()).hexdigest() == stored_hash
 
 def generate_invite_code():
     return secrets.token_hex(4).upper()
+
+def create_session(db, user_id):
+    token = secrets.token_hex(32)
+    db.execute("INSERT INTO sessions (token, user_id) VALUES (?,?)", (token, user_id))
+    return token
 
 # ── POST /api/register ────────────────────────────────────────────────────────
 @auth_bp.route('/register', methods=['POST'])
@@ -24,41 +42,43 @@ def register():
 
     db = get_db()
     try:
-        # Check if phone already registered
         existing = db.execute("SELECT id FROM users WHERE phone=?", (phone,)).fetchone()
         if existing:
             return jsonify({'ok': False, 'error': 'Phone already registered'})
 
-        # Resolve referrer
         invited_by = None
         if invite_code:
             ref = db.execute("SELECT id FROM users WHERE invite_code=?", (invite_code,)).fetchone()
             if ref:
                 invited_by = ref['id']
 
-        # Create user
+        # The check above has a race: two identical registrations can both
+        # pass it before either INSERT commits. The UNIQUE constraint on
+        # phone is the real guard — if we lose that race, catch it here and
+        # return a clean error instead of an unhandled 500.
         my_invite = generate_invite_code()
-        db.execute(
-            """INSERT INTO users (phone, password, invite_code, invited_by)
-               VALUES (?, ?, ?, ?)""",
-            (phone, hash_password(password), my_invite, invited_by)
-        )
+        try:
+            db.execute(
+                """INSERT INTO users (phone, password, invite_code, invited_by)
+                   VALUES (?, ?, ?, ?)""",
+                (phone, hash_password(password), my_invite, invited_by)
+            )
+        except Exception:
+            db.rollback()
+            return jsonify({'ok': False, 'error': 'Phone already registered'})
 
-        # Credit referrer's team count
         if invited_by:
             db.execute("UPDATE users SET invite_count=invite_count+1, team_count=team_count+1 WHERE id=?",
                        (invited_by,))
 
         db.commit()
 
-        # Auto-login after registration
         user = db.execute("SELECT * FROM users WHERE phone=?", (phone,)).fetchone()
-        token = secrets.token_hex(32)
-        db.execute("INSERT INTO sessions (token, user_id) VALUES (?,?)", (token, user['id']))
+        token = create_session(db, user['id'])
         db.commit()
 
         resp = make_response(jsonify({'ok': True}))
-        resp.set_cookie('session_token', token, httponly=True, samesite='Lax', max_age=60*60*24*30)
+        resp.set_cookie('session_token', token, httponly=True, samesite='Lax', max_age=SESSION_MAX_AGE)
         return resp
 
     finally:
@@ -76,17 +96,20 @@ def login():
 
     db = get_db()
     try:
-        user = db.execute("SELECT * FROM users WHERE phone=? AND password=?",
-                          (phone, hash_password(password))).fetchone()
-        if not user:
+        user = db.execute("SELECT * FROM users WHERE phone=?", (phone,)).fetchone()
+        if not user or not verify_password(password, user['password']):
             return jsonify({'ok': False, 'error': 'Invalid phone or password'})
 
-        token = secrets.token_hex(32)
-        db.execute("INSERT INTO sessions (token, user_id) VALUES (?,?)", (token, user['id']))
+        # Transparently upgrade legacy sha256 hashes now that we know the
+        # plaintext password was correct.
+        if not user['password'].startswith(('scrypt:', 'pbkdf2:')):
+            db.execute("UPDATE users SET password=? WHERE id=?", (hash_password(password), user['id']))
+
+        token = create_session(db, user['id'])
         db.commit()
 
         resp = make_response(jsonify({'ok': True}))
-        resp.set_cookie('session_token', token, httponly=True, samesite='Lax', max_age=60*60*24*30)
+        resp.set_cookie('session_token', token, httponly=True, samesite='Lax', max_age=SESSION_MAX_AGE)
         return resp
     finally:
         db.close()
@@ -103,3 +126,4 @@ def logout():
     resp = make_response(jsonify({'ok': True}))
     resp.delete_cookie('session_token')
     return resp
+        
