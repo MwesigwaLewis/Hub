@@ -3,8 +3,8 @@
 ════════════════════════════════════════ */
 
 const NAV_ICONS = {
-  home:   'home',
-  raffle: 'cog',
+  home:   'database',
+  raffle: 'dice-6',
   chat: 'message-circle',
   ai:     'microchip',
   income: 'wallet',
