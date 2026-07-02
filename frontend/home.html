@@ -98,11 +98,25 @@
   <!-- SCROLL CONTENT -->
   <div class="scroll-area">
     <!-- Hero -->
-    <div class="hero-banner">
-      <div class="hero-caption" id="hero-caption">
-        Hut 8's Strategic Bitcoin Reserve Surpasses $1 Billion in Market Value with Purchase of $100 Million of...
-      </div>
-    </div>
+
+
+    
+<div class="hero-banner" id="hero-banner">
+  <img id="hero-img" class="hero-img" src="/assets/images/E1_Machine.jpg" alt="">
+  
+  <div class="hero-caption" id="hero-caption">
+    Hut 8's Strategic Bitcoin Reserve Surpasses $1 Billion in Market Value with Purchase of $100 Million of...
+  </div>
+
+  <!-- Navigation dots -->
+  <div class="hero-dots" id="hero-dots"></div>
+
+
+  
+  <!-- Optional arrow buttons (visible on tap) -->
+  <div class="hero-arrow hero-prev" id="hero-prev">‹</div>
+  <div class="hero-arrow hero-next" id="hero-next">›</div>
+</div>
 
     <!-- Stats 2×2 -->
     <div class="stats-grid2">
@@ -199,6 +213,112 @@
   loadHome();
   loadMessages();
 </script>
+<script>
+const heroSlides = [
+  {
+    image: "/assets/images/E1_Machine.jpg",
+    caption: "Hut 8's Strategic Bitcoin Reserve Surpasses $1 Billion in Market Value with Purchase of $100 Million of..."
+  },
+  {
+    image: "/assets/images/E2_Machine.jpg",
+    caption: "New E-Series machines now available – Up to 2500% ROI in 120 days!"
+  },
+  {
+    image: "/assets/images/G1_Machine.jpg",
+    caption: "Join thousands earning daily with AI-powered mining machines"
+  },
+  {
+    image: "/assets/images/Z1_Machine.jpg",
+    caption: "Premium Z-Series: Highest returns for serious investors"
+  },
+  {
+    image: "/assets/images/VIP_1.jpg",
+    caption: "VIP Machines – Exclusive access for top performers"
+  }
+  // Add more slides here as needed
+];
+
+let currentIndex = 0;
+const heroImg = document.getElementById('hero-img');
+const heroCaption = document.getElementById('hero-caption');
+const heroDotsContainer = document.getElementById('hero-dots');
+
+// Render dots
+function renderDots() {
+  heroDotsContainer.innerHTML = heroSlides.map((_, i) => `
+    <div class="hero-dot \( {i === currentIndex ? 'active' : ''}" data-index=" \){i}"></div>
+  `).join('');
+  
+  // Click on dots
+  document.querySelectorAll('.hero-dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      currentIndex = parseInt(dot.dataset.index);
+      showSlide();
+    });
+  });
+}
+
+function showSlide() {
+  heroImg.style.opacity = '0';
+  
+  setTimeout(() => {
+    heroImg.src = heroSlides[currentIndex].image;
+    heroCaption.textContent = heroSlides[currentIndex].caption;
+    heroImg.style.opacity = '0.55';
+    renderDots();
+  }, 400);
+}
+
+// Auto rotate every 5 seconds
+let autoRotate = setInterval(() => {
+  currentIndex = (currentIndex + 1) % heroSlides.length;
+  showSlide();
+}, 5000);
+
+// Swipe support
+let touchStartX = 0;
+const heroBanner = document.getElementById('hero-banner');
+
+heroBanner.addEventListener('touchstart', e => {
+  touchStartX = e.changedTouches[0].screenX;
+  clearInterval(autoRotate); // Pause auto-rotate while user is swiping
+});
+
+heroBanner.addEventListener('touchend', e => {
+  const touchEndX = e.changedTouches[0].screenX;
+  const diff = touchStartX - touchEndX;
+
+  if (diff > 50) { // Swipe left → next
+    currentIndex = (currentIndex + 1) % heroSlides.length;
+    showSlide();
+  } else if (diff < -50) { // Swipe right → previous
+    currentIndex = (currentIndex - 1 + heroSlides.length) % heroSlides.length;
+    showSlide();
+  }
+  
+  // Resume auto-rotate
+  autoRotate = setInterval(() => {
+    currentIndex = (currentIndex + 1) % heroSlides.length;
+    showSlide();
+  }, 5000);
+});
+
+// Arrow buttons
+document.getElementById('hero-prev').addEventListener('click', () => {
+  currentIndex = (currentIndex - 1 + heroSlides.length) % heroSlides.length;
+  showSlide();
+});
+
+document.getElementById('hero-next').addEventListener('click', () => {
+  currentIndex = (currentIndex + 1) % heroSlides.length;
+  showSlide();
+});
+
+// Initialize
+renderDots();
+</script>
+
+  
 </body>
         </html>
 
