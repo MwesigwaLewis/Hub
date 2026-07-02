@@ -4,7 +4,7 @@
 
 const NAV_ICONS = {
   home:   'database',
-  raffle: 'dice-6',
+  raffle: 'cog',
   chat: 'message-circle',
   ai:     'microchip',
   income: 'wallet',
@@ -27,6 +27,7 @@ function renderNav(activePage) {
   const pages = [
     { id: 'home',   label: 'Home',   href: 'home.html' },
     { id: 'raffle', label: 'Raffle', href: 'raffle.html' },
+     {id: 'chat', label: 'Chat', href: 'chat.html'},
     { id: 'ai',     label: 'AI',     href: 'ai.html' },
     { id: 'income', label: 'Income', href: 'income.html' },
     { id: 'my',     label: 'My',     href: 'my.html' },
