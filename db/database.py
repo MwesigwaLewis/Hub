@@ -248,6 +248,32 @@ def init_db():
         )
     """)
 
+    # ── Reward codes: manager-created, redeemable by any number of DIFFERENT
+    #    users (each only once each — enforced by the UNIQUE constraint below),
+    #    only within the [valid_from, valid_until] window the manager set. ─────
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS reward_codes (
+            id          SERIAL PRIMARY KEY,
+            code        TEXT NOT NULL UNIQUE,
+            amount      DOUBLE PRECISION NOT NULL,
+            description TEXT,
+            valid_from  TIMESTAMP NOT NULL,
+            valid_until TIMESTAMP NOT NULL,
+            active      BOOLEAN NOT NULL DEFAULT TRUE,
+            created_by  INTEGER REFERENCES admins(id),
+            created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS reward_redemptions (
+            id          SERIAL PRIMARY KEY,
+            code_id     INTEGER NOT NULL REFERENCES reward_codes(id),
+            user_id     INTEGER NOT NULL REFERENCES users(id),
+            redeemed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (code_id, user_id)
+        )
+    """)
+
     # ── Messages / announcements ──────────────────────────────────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS messages (
@@ -336,6 +362,8 @@ def init_db():
     cur.execute("CREATE INDEX IF NOT EXISTS idx_withdraw_req_user_id ON withdraw_requests(user_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_raffle_records_user_id ON raffle_records(user_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON chat_messages(user_id, created_at)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_reward_redemptions_code_id ON reward_redemptions(code_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_reward_redemptions_user_id ON reward_redemptions(user_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin_id ON admin_sessions(admin_id)")
 
     conn.commit()
@@ -344,4 +372,3 @@ def init_db():
     print("[DB] All tables ready (Supabase/Postgres).")
 
 
-    
