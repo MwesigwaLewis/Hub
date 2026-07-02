@@ -4,7 +4,7 @@
 
 const NAV_ICONS = {
   home:   'home',
-  raffle: 'ticket',
+  raffle: 'cog',
   chat: 'message-circle',
   ai:     'microchip',
   income: 'wallet',
