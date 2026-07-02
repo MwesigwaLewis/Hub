@@ -123,11 +123,14 @@ def verify_deposit(current_user):
             WHERE tx_ref=?
         """, (str(txn.get('id', transaction_id)), network, datetime.utcnow(), tx_ref))
 
+        # Grant one raffle ticket per successful deposit. Without this,
+        # raffle_ready never leaves 0 and the raffle page is unreachable.
         db.execute("""
             UPDATE users
             SET balance       = balance + ?,
                 wallet        = wallet  + ?,
-                total_deposit = total_deposit + ?
+                total_deposit = total_deposit + ?,
+                raffle_ready  = raffle_ready + 1
             WHERE id = ?
         """, (credited, credited, credited, current_user['id']))
 
@@ -142,3 +145,4 @@ def verify_deposit(current_user):
 
     finally:
         db.close()
+    
