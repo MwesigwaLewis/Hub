@@ -29,9 +29,9 @@ if not DATABASE_URL:
 _pool = ConnectionPool(
     conninfo=DATABASE_URL,
     min_size=1,
-    max_size=10,
-    kwargs={"sslmode": "require", "row_factory": dict_row},
+    max_size=2,          # Supabase free tier — keep well under the 15-conn limit
     open=True,
+    kwargs={"sslmode": "require", "row_factory": dict_row},
 )
 
 
@@ -301,6 +301,21 @@ def init_db():
     cur.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'manager'")
     cur.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS manager_code TEXT UNIQUE")
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_manager_id INTEGER REFERENCES admins(id)")
+    # Manager profile picture + cross-visibility grant from super
+    cur.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS avatar_url TEXT")
+    cur.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS can_see_all BOOLEAN NOT NULL DEFAULT FALSE")
+    # Activity audit log — every non-super admin action, visible only to super
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS admin_activity_log (
+            id         SERIAL PRIMARY KEY,
+            admin_id   INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+            action     TEXT NOT NULL,
+            detail     TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_admin_activity_admin_id ON admin_activity_log(admin_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_admin_activity_created ON admin_activity_log(created_at DESC)")
     # Backfill manager_code for any admin rows created before this existed.
     cur.execute("SELECT id FROM admins WHERE manager_code IS NULL")
     for (aid,) in cur.fetchall():
