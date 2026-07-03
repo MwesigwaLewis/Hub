@@ -10,7 +10,7 @@
 const NAV_ICONS = {
   home:   'database',       
   raffle: 'cog',            
-  chat:   'fa-sharp fa-solid fa-comments fa-buzz fa-2xs',
+  chat:   'fa-sharp fa-solid fa-comments',
   ai:     'microchip',            
   income: 'badge-dollar-sign',      
   my:     'user',                 
