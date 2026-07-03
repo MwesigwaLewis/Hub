@@ -166,3 +166,5 @@ def verify_deposit(current_user):
 
     finally:
         db.close()
+
+    
