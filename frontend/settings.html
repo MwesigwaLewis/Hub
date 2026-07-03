@@ -158,12 +158,36 @@
     } catch(e) { document.getElementById('modal-nick').classList.remove('open'); toast('❌ Connection error'); }
   }
 
-  function previewAvatar(input) {
+  async function previewAvatar(input) {
     const file = input.files[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    document.getElementById('settings-avatar').innerHTML = `<img src="${url}" alt="avatar">`;
-    toast('Avatar preview updated (connect API to save)');
+    if (file.size > 2 * 1024 * 1024) { toast('Image must be under 2 MB'); return; }
+
+    // Show a local preview immediately
+    const localUrl = URL.createObjectURL(file);
+    document.getElementById('settings-avatar').innerHTML = `<img src="${localUrl}" alt="avatar">`;
+
+    // Convert to base64 data URL and save via profile API
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const dataUrl = e.target.result;
+      try {
+        const r = await fetch('/api/profile/avatar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ avatar_url: dataUrl }),
+        });
+        const d = await r.json();
+        if (d.ok) {
+          toast('✅ Profile picture saved!');
+        } else {
+          toast('❌ ' + (d.error || 'Could not save avatar'));
+        }
+      } catch(e) {
+        toast('❌ Connection error saving avatar');
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   async function doLogout() {
