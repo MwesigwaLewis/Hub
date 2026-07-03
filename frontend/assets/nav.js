@@ -7,7 +7,7 @@ const NAV_ICONS = {
   raffle: 'cog',
   chat: 'message-circle',
   ai:     'microchip',
-  income: 'wallet',
+  income: 'badge-dollar-sign',
   my:     'user',
 };
 
