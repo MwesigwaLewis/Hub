@@ -47,10 +47,44 @@ def register():
             return jsonify({'ok': False, 'error': 'Phone already registered'})
 
         invited_by = None
+        assigned_manager_id = None
         if invite_code:
-            ref = db.execute("SELECT id FROM users WHERE invite_code=?", (invite_code,)).fetchone()
+            ref = db.execute("SELECT id, assigned_manager_id FROM users WHERE invite_code=?", (invite_code,)).fetchone()
             if ref:
                 invited_by = ref['id']
+                # Rule: an invitee always gets the SAME manager as whoever
+                # invited them — even if that means staying unassigned,
+                # because the inviter is unassigned too.
+                assigned_manager_id = ref['assigned_manager_id']
+
+        if invited_by is None:
+            # No referrer — either a manager's own direct signup link
+            # (?mgr=CODE on index.html), or a fully organic signup.
+            manager_code = (data.get('manager_code') or '').strip().upper()
+            if manager_code:
+                mgr = db.execute("SELECT id FROM admins WHERE manager_code=?", (manager_code,)).fetchone()
+                if mgr:
+                    assigned_manager_id = mgr['id']
+
+            if assigned_manager_id is None:
+                # Round-robin fallback so organic signups still land with
+                # someone: whichever manager currently has the fewest
+                # assigned users. 'super' accounts are excluded from this
+                # pool — they're for oversight, not holding a batch.
+                least_loaded = db.execute("""
+                    SELECT a.id
+                    FROM admins a
+                    LEFT JOIN users u ON u.assigned_manager_id = a.id
+                    WHERE a.role = 'manager'
+                    GROUP BY a.id
+                    ORDER BY COUNT(u.id) ASC, a.id ASC
+                    LIMIT 1
+                """).fetchone()
+                if least_loaded:
+                    assigned_manager_id = least_loaded['id']
+                # If there are no 'manager' accounts at all yet (e.g. brand
+                # new deployment with only the seeded super), this stays
+                # NULL — a super can assign them once managers exist.
 
         # The check above has a race: two identical registrations can both
         # pass it before either INSERT commits. The UNIQUE constraint on
@@ -59,9 +93,9 @@ def register():
         my_invite = generate_invite_code()
         try:
             db.execute(
-                """INSERT INTO users (phone, password, invite_code, invited_by)
-                   VALUES (?, ?, ?, ?)""",
-                (phone, hash_password(password), my_invite, invited_by)
+                """INSERT INTO users (phone, password, invite_code, invited_by, assigned_manager_id)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (phone, hash_password(password), my_invite, invited_by, assigned_manager_id)
             )
         except Exception:
             db.rollback()
@@ -126,4 +160,5 @@ def logout():
     resp = make_response(jsonify({'ok': True}))
     resp.delete_cookie('session_token')
     return resp
-        
+
+                              
