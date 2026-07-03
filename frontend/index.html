@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Future AI Hub — Login</title>
   <link rel="stylesheet" href="assets/shared.css">
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <style>
     body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
     .auth-wrap {
@@ -72,12 +71,12 @@
     <h1 class="auth-title">Welcome</h1>
 
     <div class="field-wrap">
-      <span class="field-icon"><i data-lucide="smartphone"></i></span>
+      <span class="field-icon">📱</span>
       <input class="auth-field" id="login-phone" type="tel" placeholder="Phone Number" autocomplete="off">
     </div>
 
     <div class="field-wrap">
-      <span class="field-icon"><i data-lucide="key-round"></i></span>
+      <span class="field-icon">🔑</span>
       <input class="auth-field" id="login-pass" type="password" placeholder="Password">
       <button class="eye-btn" type="button" onclick="togglePw('login-pass',this)">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
@@ -101,19 +100,19 @@
   <div class="panel hidden" id="panel-register">
     <h1 class="auth-title">Welcome</h1>
     <div class="field-wrap">
-      <span class="field-icon"><i data-lucide="smartphone"></i></span>
+      <span class="field-icon">📱</span>
       <input class="auth-field" id="reg-phone" type="tel" placeholder="Phone Number">
     </div>
     <div class="field-wrap">
-      <span class="field-icon"><i data-lucide="key-round"></i></span>
+      <span class="field-icon">🔑</span>
       <input class="auth-field" id="reg-pass" type="password" placeholder="Set Password">
     </div>
     <div class="field-wrap">
-      <span class="field-icon"><i data-lucide="key-round"></i></span>
+      <span class="field-icon">🔑</span>
       <input class="auth-field" id="reg-confirm" type="password" placeholder="Confirm Password">
     </div>
     <div class="field-wrap">
-      <span class="field-icon"><i data-lucide="link"></i></span>
+      <span class="field-icon">🔗</span>
       <input class="auth-field" id="reg-invite" type="text" placeholder="Invitation Code">
     </div>
     <button class="auth-btn" onclick="doRegister()">Register</button>
@@ -134,10 +133,24 @@ function showPanel(name) {
 
 // Arrived via a shared invite link (my.html's Invite button generates
 // index.html?ref=CODE) — jump straight to Register with the code filled in.
+// A manager's own direct signup link (index.html?mgr=CODE) works the same
+// way but silently, via a hidden field — it's a routing hint, not something
+// the person needs to see or type themselves.
 (function prefillInviteFromLink() {
-  const ref = new URLSearchParams(window.location.search).get('ref');
+  const params = new URLSearchParams(window.location.search);
+  const ref = params.get('ref');
+  const mgr = params.get('mgr');
   if (ref) {
     document.getElementById('reg-invite').value = ref;
+  }
+  if (mgr) {
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.id = 'reg-manager-code';
+    hidden.value = mgr;
+    document.getElementById('panel-register').appendChild(hidden);
+  }
+  if (ref || mgr) {
     showPanel('register');
   }
 })();
@@ -179,19 +192,21 @@ async function doRegister() {
   const pass    = document.getElementById('reg-pass').value;
   const confirm = document.getElementById('reg-confirm').value;
   const invite  = document.getElementById('reg-invite').value.trim();
+  const mgrEl   = document.getElementById('reg-manager-code');
+  const managerCode = mgrEl ? mgrEl.value.trim() : '';
   if (!phone || !pass || !confirm) { toast('Please fill all fields'); return; }
   if (pass !== confirm) { toast('Passwords do not match'); return; }
   try {
     const r = await fetch('/api/register', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ phone, password: pass, invite_code: invite })
+      body: JSON.stringify({ phone, password: pass, invite_code: invite, manager_code: managerCode })
     });
     const d = await r.json();
     if (d.ok) { toast('Registration successful!'); setTimeout(() => window.location.href = 'home.html', 900); }
     else { toast(d.error || 'Registration failed'); }
   } catch(e) { toast('Connection error'); }
 }
-  lucide.createIcons()
 </script>
 </body>
-</html>
+                                  </html>
+        
