@@ -42,3 +42,4 @@ def recompute_vip_level(db, user_id):
         return
     new_level = vip_level_for(row['depositing_invites'] or 0)
     db.execute("UPDATE users SET vip_level=? WHERE id=?", (new_level, user_id))
+    
