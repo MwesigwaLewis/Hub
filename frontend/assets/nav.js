@@ -1,14 +1,19 @@
 /* ════════════════════════════════════════
-   FUTURE AI HUB — NAV ICONS (Lucide, https://lucide.dev)
+   FUTURE AI HUB — NAV ICONS
+   (Lucide for most, Font Awesome for specific ones)
+   HOW TO SWITCH AN ICON TO FONT AWESOME:
+   Just replace the value with a Font Awesome class string.
+   Examples: 'fa-solid fa-comment', 'fa-regular fa-bell', 'fa-brands fa-discord'
+   Anything NOT starting with 'fa-' stays as Lucide.
 ════════════════════════════════════════ */
 
 const NAV_ICONS = {
-  home:   'database',
-  raffle: 'cog',
-  chat: 'message-circle',
-  ai:     'microchip',
-  income: 'badge-dollar-sign',
-  my:     'user',
+  home:   'database',       
+  raffle: 'cog',            
+  chat:   'fa-sharp fa-solid fa-comments fa-buzz fa-2xs',
+  ai:     'microchip',            
+  income: 'badge-dollar-sign',      
+  my:     'user',                 
 };
 
 // Some pages (currently my.html) already load Lucide themselves; for
@@ -23,23 +28,52 @@ function ensureLucide(cb) {
   document.head.appendChild(script);
 }
 
+// Load Font Awesome CDN only when needed
+function ensureFontAwesome(cb) {
+  if (window.FontAwesome) { cb && cb(); return; }
+  const existing = document.querySelector('script[src*="fontawesome"]');
+  if (existing) { cb && existing.addEventListener('load', cb); return; }
+  const script = document.createElement('script');
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js';
+  script.crossOrigin = 'anonymous';
+  script.onload = () => cb && cb();
+  document.head.appendChild(script);
+}
+
 function renderNav(activePage) {
   const pages = [
     { id: 'home',   label: 'Home',   href: 'home.html' },
     { id: 'raffle', label: 'Raffle', href: 'raffle.html' },
-     {id: 'chat', label: 'Chat', href: 'chat.html'},
+    { id: 'chat',   label: 'Chat',   href: 'chat.html' },
     { id: 'ai',     label: 'AI',     href: 'ai.html' },
     { id: 'income', label: 'Income', href: 'income.html' },
     { id: 'my',     label: 'My',     href: 'my.html' },
   ];
   const nav = document.getElementById('bottom-nav');
   if (!nav) return;
-  nav.innerHTML = pages.map(p => `
-    <a href="${p.href}" class="nav-item${p.id === activePage ? ' active' : ''}">
-      <div class="nav-icon"><i data-lucide="${NAV_ICONS[p.id]}"></i></div>
-      <span>${p.label}</span>
-    </a>
-  `).join('');
+
+  nav.innerHTML = pages.map(p => {
+    const iconName = NAV_ICONS[p.id];
+    const isFa = iconName.startsWith('fa-');
+    
+    // Font Awesome uses <i class="...">, Lucide uses <i data-lucide="...">
+    const iconHtml = isFa 
+      ? `<i class="${iconName}"></i>`
+      : `<i data-lucide="${iconName}"></i>`;
+
+    return `
+      <a href="${p.href}" class="nav-item${p.id === activePage ? ' active' : ''}">
+        <div class="nav-icon">${iconHtml}</div>
+        <span>${p.label}</span>
+      </a>
+    `;
+  }).join('');
+
+  // Load Font Awesome only if any nav icon uses it
+  const needsFa = pages.some(p => NAV_ICONS[p.id].startsWith('fa-'));
+  if (needsFa) ensureFontAwesome();
+
+  // Always load Lucide for the remaining icons
   ensureLucide(() => window.lucide.createIcons());
 }
 
