@@ -32,7 +32,8 @@ def my_machines(current_user):
                 um.id, um.user_id, um.machine_id, um.daily_income,
                 um.total_income, um.earned, um.status,
                 um.purchase_price AS price,
-                m.series, m.lock,
+                um.lock_days AS lock,
+                m.series, m.image_url,
                 to_char(um.bought_at,  'YYYY-MM-DD') AS start_date,
                 to_char(um.expires_at, 'YYYY-MM-DD') AS end_date
             FROM user_machines um
@@ -78,13 +79,16 @@ def buy_machine(current_user):
             db.rollback()
             return jsonify({'ok': False, 'error': 'Insufficient balance'})
 
-        # Record ownership
+        # Record ownership. lock_days is snapshotted here (not re-derived from
+        # machines.lock later) so if a manager edits the catalog's lock period
+        # afterward, it doesn't retroactively change what this buyer was
+        # actually promised.
         db.execute("""
             INSERT INTO user_machines
-                (user_id, machine_id, purchase_price, daily_income, total_income, expires_at)
-            VALUES (?,?,?,?,?,?)
+                (user_id, machine_id, purchase_price, daily_income, total_income, expires_at, lock_days)
+            VALUES (?,?,?,?,?,?,?)
         """, (current_user['id'], machine_id, machine['price'],
-               daily_income, machine['income'], expires_at))
+               daily_income, machine['income'], expires_at, lock_days))
 
         # Log transaction
         db.execute(
@@ -96,5 +100,3 @@ def buy_machine(current_user):
         return jsonify({'ok': True})
     finally:
         db.close()
-
-    
