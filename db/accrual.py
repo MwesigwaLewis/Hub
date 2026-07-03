@@ -1,21 +1,29 @@
 """
-Real-time earnings accrual.
+Daily earnings accrual.
 
 Machines don't have a background worker paying them out — instead, earnings
-are computed on-demand from elapsed wall-clock time whenever a logged-in
-user makes a request. This means income starts accumulating the moment a
-machine is bought (bought_at = purchase time) rather than waiting for some
-external cron job that doesn't exist in this project.
+are computed on-demand from elapsed whole days whenever a logged-in user
+makes a request. Call accrue_user_earnings(db, user_id) once per
+authenticated request (wired into middleware/auth.py) BEFORE reading the
+user row, so it's never more than one request stale.
 
-Call accrue_user_earnings(db, user_id) once per authenticated request
-(wired into middleware/auth.py) BEFORE reading the user row, so every page
-the user loads reflects up-to-the-second earnings.
+IMPORTANT — this pays out in whole-day steps, not continuously:
+Earlier versions computed accrual from fractional elapsed seconds, which
+credited a tiny sliver of income (a fraction of a cent) on every single page
+load — confusing to see, and because daily_income was itself pre-rounded to
+2 decimals at purchase time, the running total could fall a few cents short
+of total_income by the final day instead of matching it exactly.
 
-Performance note: this used to issue one UPDATE (and one INSERT) per
-running machine, so a user with N machines cost N+1 sequential DB round
-trips on every single page load. It's now batched into at most 4 round
-trips total regardless of N — one SELECT, one batched UPDATE, one batched
-INSERT, one UPDATE on the user row.
+This version instead tracks whole days elapsed since purchase and computes
+each day's payout as a CUMULATIVE share of total_income:
+    owed_after_day(k) = round(total_income * k / lock_days, 2)
+    credited_on_day(k) = owed_after_day(k) - owed_after_day(k-1)
+Two things fall out of that for free:
+  1. Nothing is credited between whole-day boundaries — no more mystery
+     fractional-cent transactions between page loads.
+  2. Summing every day's credit from k=1..lock_days telescopes to exactly
+     round(total_income, 2) — the machine's full total_income, exactly, on
+     the last day. No rounding shortfall.
 """
 from datetime import datetime, timezone
 
@@ -31,15 +39,17 @@ def _as_utc(dt):
 
 def accrue_user_earnings(db, user_id):
     """
-    Walk every 'running' machine owned by user_id, compute how much of its
-    total_income has accrued since bought_at (capped at total_income once
-    the lock period has fully elapsed), and credit the DELTA since the last
-    time we checked (tracked via the 'earned' column on user_machines).
+    Walk every 'running' machine owned by user_id, compute the cumulative
+    whole-day payout owed since bought_at (capped at total_income once
+    lock_days have fully elapsed), and credit the DELTA since the last time
+    we checked (tracked via the 'earned' column on user_machines, which now
+    always equals owed_after_day(days_elapsed)).
 
-    Any machine that has now fully paid out is flipped to status='expired'.
+    Any machine whose full lock period has elapsed is flipped to
+    status='expired'.
     """
     machines = db.execute("""
-        SELECT id, user_id, daily_income, total_income, earned, bought_at, expires_at
+        SELECT id, user_id, total_income, earned, bought_at, expires_at, lock_days
         FROM user_machines
         WHERE user_id = ? AND status = 'running'
     """, (user_id,)).fetchall()
@@ -56,18 +66,25 @@ def accrue_user_earnings(db, user_id):
         bought_at = _as_utc(m['bought_at']) or now
         expires_at = _as_utc(m['expires_at'])
 
-        elapsed_seconds = (min(now, expires_at) if expires_at else now) - bought_at
-        elapsed_days = max(elapsed_seconds.total_seconds(), 0) / 86400.0
+        # lock_days should always be set (snapshotted at purchase, backfilled
+        # by migration for older rows) — this is just a last-resort fallback
+        # so a missing value can never divide by zero.
+        lock_days = m['lock_days']
+        if not lock_days or lock_days < 1:
+            lock_days = max(1, round(((expires_at - bought_at).total_seconds() / 86400))) if expires_at else 1
 
-        accrued = min(m['daily_income'] * elapsed_days, m['total_income'])
-        delta = max(accrued - m['earned'], 0)
+        elapsed_td = (min(now, expires_at) if expires_at else now) - bought_at
+        days_elapsed = max(0, min(elapsed_td.days, lock_days))
+
+        owed = round(m['total_income'] * days_elapsed / lock_days, 2)
+        delta = max(owed - (m['earned'] or 0.0), 0)
         newly_expired = expires_at is not None and now >= expires_at
 
-        machine_updates.append((m['id'], accrued, 'expired' if newly_expired else 'running'))
+        machine_updates.append((m['id'], owed, 'expired' if newly_expired else 'running'))
 
         if delta > 0:
             total_delta += delta
-            tx_rows.append((user_id, 'ai_income', delta, f"AI machine income (machine #{m['id']})"))
+            tx_rows.append((user_id, 'ai_income', delta, f"AI machine income — day {days_elapsed}/{lock_days} (machine #{m['id']})"))
 
     # One round trip to update every machine at once, instead of one UPDATE
     # per machine. Explicit casts avoid "could not determine data type of
@@ -100,4 +117,4 @@ def accrue_user_earnings(db, user_id):
         """, (total_delta, total_delta, total_delta, user_id))
 
     db.commit()
-    
+        
