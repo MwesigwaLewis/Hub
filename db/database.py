@@ -1,4 +1,5 @@
 import os
+import secrets
 import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
@@ -219,11 +220,13 @@ def init_db():
     #    session or vice versa) ───────────────────────────────────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS admins (
-            id         SERIAL PRIMARY KEY,
-            username   TEXT NOT NULL UNIQUE,
-            password   TEXT NOT NULL,
-            name       TEXT NOT NULL DEFAULT 'Manager',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            id           SERIAL PRIMARY KEY,
+            username     TEXT NOT NULL UNIQUE,
+            password     TEXT NOT NULL,
+            name         TEXT NOT NULL DEFAULT 'Manager',
+            role         TEXT NOT NULL DEFAULT 'manager',   -- 'super' or 'manager'
+            manager_code TEXT UNIQUE,                        -- personal signup-link code
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
@@ -283,6 +286,26 @@ def init_db():
         )
     """)
 
+    # ── Migrations for databases created before these columns/defaults existed ──
+    # Placed here, before any seed-data block below, so every column referenced
+    # by seeding logic (e.g. admins.role, admins.manager_code) is guaranteed to
+    # exist first — regardless of whether this is a fresh install or an
+    # upgrade of a database that already has some of these tables.
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS depositing_invites INTEGER NOT NULL DEFAULT 0")
+    cur.execute("ALTER TABLE users ALTER COLUMN vip_level SET DEFAULT 0")
+    cur.execute("ALTER TABLE user_machines ADD COLUMN IF NOT EXISTS lock_days INTEGER")
+    cur.execute("""
+        UPDATE user_machines SET lock_days = GREATEST(1, ROUND(EXTRACT(EPOCH FROM (expires_at - bought_at)) / 86400)::int)
+        WHERE lock_days IS NULL
+    """)
+    cur.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'manager'")
+    cur.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS manager_code TEXT UNIQUE")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_manager_id INTEGER REFERENCES admins(id)")
+    # Backfill manager_code for any admin rows created before this existed.
+    cur.execute("SELECT id FROM admins WHERE manager_code IS NULL")
+    for (aid,) in cur.fetchall():
+        cur.execute("UPDATE admins SET manager_code=%s WHERE id=%s", (secrets.token_hex(4).upper(), aid))
+
     # ── Seed default machines if table is empty ───────────────────────────────
     cur.execute("SELECT COUNT(*) FROM machines")
     if cur.fetchone()[0] == 0:
@@ -331,21 +354,19 @@ def init_db():
     # There's no self-serve admin signup (by design — see routes/admin.py), so
     # something has to create the first account. Override via env vars before
     # first deploy; otherwise a default is created and logged so you notice it.
+    # It's seeded as role='super' — the only role that can see every batch,
+    # manage other managers, and reassign users between them.
     cur.execute("SELECT COUNT(*) FROM admins")
     if cur.fetchone()[0] == 0:
         from werkzeug.security import generate_password_hash
         default_user = os.environ.get('ADMIN_USERNAME', 'admin')
         default_pass = os.environ.get('ADMIN_PASSWORD', 'changeme123')
         cur.execute(
-            "INSERT INTO admins (username, password, name) VALUES (%s, %s, %s)",
-            (default_user, generate_password_hash(default_pass), 'Manager')
+            "INSERT INTO admins (username, password, name, role, manager_code) VALUES (%s, %s, %s, 'super', %s)",
+            (default_user, generate_password_hash(default_pass), 'Manager', secrets.token_hex(4).upper())
         )
-        print(f"[DB] Seeded default admin '{default_user}'. "
+        print(f"[DB] Seeded default admin '{default_user}' with role=super. "
               f"{'Using ADMIN_PASSWORD from env.' if os.environ.get('ADMIN_PASSWORD') else '⚠️  Using default password changeme123 — log in at /admin/login.html and change it immediately.'}")
-
-    # ── Migrations for databases created before this column/default existed ──
-    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS depositing_invites INTEGER NOT NULL DEFAULT 0")
-    cur.execute("ALTER TABLE users ALTER COLUMN vip_level SET DEFAULT 0")
 
     # ── Indexes ───────────────────────────────────────────────────────────────
     # These columns are hit on essentially every request (session check on
@@ -355,6 +376,7 @@ def init_db():
     # implicit indexes from their UNIQUE/PRIMARY KEY constraints.
     cur.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_users_invited_by ON users(invited_by)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_users_assigned_manager_id ON users(assigned_manager_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_user_machines_user_id ON user_machines(user_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_user_machines_user_status ON user_machines(user_id, status)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)")
@@ -372,3 +394,4 @@ def init_db():
     print("[DB] All tables ready (Supabase/Postgres).")
 
 
+    
