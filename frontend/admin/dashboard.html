@@ -144,6 +144,12 @@
 <!-- USERS -->
 <div class="tab-panel" id="panel-users">
   <div class="search-bar"><input id="user-search" placeholder="Search phone or nickname…"></div>
+  <div class="search-bar" id="manager-filter-bar" style="display:none">
+    <select id="manager-filter">
+      <option value="">All Managers</option>
+      <option value="unassigned">Unassigned</option>
+    </select>
+  </div>
   <div id="user-list"><div class="empty-state">Loading…</div></div>
 </div>
 
@@ -246,6 +252,7 @@
   api('/api/admin/me').then(d => {
     if (!d.ok) { window.location.href = 'login.html'; return; }
     ME = d;
+    initManagerFilter();
     refreshAll();
   }).catch(() => { window.location.href = 'login.html'; });
 
@@ -357,24 +364,52 @@
   };
 
   /* ══════════════════════ USERS ══════════════════════ */
-  async function loadUsers(search) {
-    const url = search ? `/api/admin/users?search=${encodeURIComponent(search)}` : '/api/admin/users';
-    const d = await api(url);
+  let managersById = {};
+
+  async function loadUsers(search, managerId) {
+    const filterEl = document.getElementById('manager-filter');
+    const effectiveManager = managerId !== undefined ? managerId : (filterEl ? filterEl.value : '');
+    if (managerId !== undefined && filterEl) filterEl.value = managerId;
+
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (effectiveManager) params.set('manager', effectiveManager);
+    const d = await api('/api/admin/users?' + params.toString());
     const list = document.getElementById('user-list');
     if (!d.ok || !d.users.length) { list.innerHTML = '<div class="empty-state">No users found</div>'; return; }
-    list.innerHTML = d.users.map(u => `
+    list.innerHTML = d.users.map(u => {
+      const mgrName = u.assigned_manager_id ? (managersById[u.assigned_manager_id] || `#${u.assigned_manager_id}`) : 'Unassigned';
+      return `
       <div class="row-card" onclick="openUserDetail(${u.id})" style="cursor:pointer">
         <div class="row-top"><span class="row-amount">${fmt(u.balance)}</span><span class="row-sub">Joined ${u.created_at}</span></div>
         <div class="row-sub">${esc(u.phone)} ${u.nick ? '· ' + esc(u.nick) : ''} · VIP ${u.vip_level}</div>
         <div class="row-sub">Deposited ${fmt(u.total_deposit)} · Withdrawn ${fmt(u.total_withdraw)} · AI income ${fmt(u.ai_income)} · ${u.invite_count} invites</div>
+        ${ME && ME.is_super ? `<div class="row-sub">Manager: <b style="color:var(--cyan)">${esc(mgrName)}</b></div>` : ''}
       </div>
-    `).join('');
+    `;
+    }).join('');
   }
   let searchTimer = null;
   document.getElementById('user-search').addEventListener('input', (e) => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => loadUsers(e.target.value.trim()), 300);
   });
+
+  async function initManagerFilter() {
+    if (!ME || !ME.is_super) return;
+    document.getElementById('manager-filter-bar').style.display = 'block';
+    const d = await api('/api/admin/admins');
+    if (!d.ok) return;
+    const select = document.getElementById('manager-filter');
+    d.admins.forEach(a => {
+      managersById[a.id] = a.name;
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = `${a.name} (${a.batch_size})`;
+      select.appendChild(opt);
+    });
+    select.addEventListener('change', () => loadUsers(document.getElementById('user-search').value.trim(), select.value));
+  }
 
   const USER_FIELD_LABELS = {
     phone: 'Phone', nick: 'Nickname', email: 'Email', vip_level: 'VIP Level',
@@ -430,12 +465,27 @@
       </div>
     `).join('') : '<div class="empty-state">No transactions</div>';
 
+    const reassignHtml = (ME && ME.is_super) ? `
+      <div class="divider"></div>
+      <div class="sub-heading">Manager Assignment</div>
+      <div class="form-field">
+        <select id="reassign-manager">
+          <option value="">Unassigned</option>
+          ${Object.entries(managersById).map(([id, name]) =>
+            `<option value="${id}" ${String(u.assigned_manager_id) === String(id) ? 'selected' : ''}>${esc(name)}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="form-actions"><button class="btn-secondary" onclick="reassignUser(${u.id})">Reassign</button></div>
+    ` : '';
+
     document.getElementById('user-overlay-body').innerHTML = `
       <div class="sub-heading">Edit Fields</div>
       ${fieldsHtml}
       <div class="form-actions">
         <button class="btn-primary" onclick="saveUserFields(${u.id})">Save Changes</button>
       </div>
+      ${reassignHtml}
 
       <div class="divider"></div>
       <div class="sub-heading">Adjust Balance</div>
@@ -462,6 +512,14 @@
       <div class="divider"></div>
       <div class="form-actions"><button class="btn-danger" onclick="deleteUser(${u.id})">Delete User Permanently</button></div>
     `;
+  };
+  window.reassignUser = async function (userId) {
+    const val = document.getElementById('reassign-manager').value;
+    const d = await api(`/api/admin/users/${userId}/reassign`, {
+      method: 'POST', body: JSON.stringify({ manager_id: val ? parseInt(val) : null }),
+    });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Reassigned'); loadUsers(); loadManagers();
   };
   document.getElementById('user-overlay-close').addEventListener('click', () => { closeOverlays(); loadUsers(); loadStats(); });
 
@@ -621,15 +679,31 @@
       <div class="row-card">
         <div class="row-top">
           <span style="font-weight:700;color:#fff">${esc(a.name)} ${a.is_you ? '<span style="color:var(--cyan);font-size:11px">(you)</span>' : ''}</span>
-          <span class="row-sub">Added ${a.created_at}</span>
+          <span class="status-pill ${a.role === 'super' ? 'pill-successful' : 'pill-pending'}">${a.role}</span>
         </div>
-        <div class="row-sub">@${esc(a.username)}</div>
-        ${!a.is_you ? `<div class="row-actions"><button class="act-btn act-reject" onclick="removeManager(${a.id})">Remove</button></div>` : ''}
+        <div class="row-sub">@${esc(a.username)} · ${a.batch_size} user${a.batch_size == 1 ? '' : 's'} in batch · added ${a.created_at}</div>
+        <div class="row-sub">Signup link: <code style="color:var(--cyan)">?mgr=${esc(a.manager_code)}</code></div>
+        <div class="row-actions">
+          <button class="act-btn act-neutral" onclick="copyManagerLink('${esc(a.manager_code)}')">Copy Signup Link</button>
+          ${ME && ME.is_super ? `<button class="act-btn act-neutral" onclick="filterUsersByManager(${a.id})">View Batch</button>` : ''}
+          ${!a.is_you ? `<button class="act-btn act-reject" onclick="removeManager(${a.id})">Remove</button>` : ''}
+        </div>
       </div>
     `).join('');
   }
+  window.copyManagerLink = function (code) {
+    const link = `${window.location.origin}/index.html?mgr=${code}`;
+    navigator.clipboard.writeText(link).then(() => toast('Signup link copied!')).catch(() => toast(link));
+  };
+  window.filterUsersByManager = function (managerId) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector('[data-tab="users"]').classList.add('active');
+    document.getElementById('panel-users').classList.add('active');
+    loadUsers('', managerId);
+  };
   window.removeManager = async function (id) {
-    if (!confirm('Remove this manager account?')) return;
+    if (!confirm('Remove this manager account? Their batch will become unassigned until reassigned.')) return;
     const d = await api(`/api/admin/admins/${id}`, { method: 'DELETE' });
     if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
     toast('✅ Manager removed'); loadManagers();
@@ -641,15 +715,24 @@
       <div class="form-field"><label>Display Name</label><input id="am-name" placeholder="e.g. Sarah"></div>
       <div class="form-field"><label>Username</label><input id="am-username"></div>
       <div class="form-field"><label>Password</label><input id="am-password" type="text" placeholder="At least 8 characters"></div>
+      ${ME && ME.is_super ? `
+        <div class="form-field" style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" id="am-super" style="width:auto">
+          <label style="margin:0">Make Super Manager (sees every batch)</label>
+        </div>
+      ` : ''}
+      <div class="mini-note">A personal signup link is generated automatically — anyone who registers through it lands in this manager's batch. Anyone THEY invite inherits the same manager.</div>
       <div class="form-actions"><button class="btn-primary" onclick="submitAddManager()">Create Manager</button></div>
     `;
     document.getElementById('form-overlay').classList.add('open');
   };
   window.submitAddManager = async function () {
+    const superEl = document.getElementById('am-super');
     const body = {
       name: document.getElementById('am-name').value.trim(),
       username: document.getElementById('am-username').value.trim(),
       password: document.getElementById('am-password').value,
+      role: (superEl && superEl.checked) ? 'super' : 'manager',
     };
     const d = await api('/api/admin/admins', { method: 'POST', body: JSON.stringify(body) });
     if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
