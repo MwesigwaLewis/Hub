@@ -8,7 +8,7 @@
 ════════════════════════════════════════ */
 
 const NAV_ICONS = {
-  home:   'database',       
+  home:   'fa-solid fa-database',       
   raffle: 'cog',            
   chat:   'fa-sharp fa-solid fa-comments',
   ai:     'microchip',            
