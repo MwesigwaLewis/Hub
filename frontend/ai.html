@@ -556,7 +556,7 @@
     let html = '<div class="s-tab active" data-series="All">All</div>';
     for (const s of availableSeries) {
       const label = s === 'VIP' ? 'VIP Series' : s + ' series';
-      html += `<div class="s-tab" data-series="${s}">${label}</div>`;
+      html += `<div class="s-tab" data-series="\( {s}"> \){label}</div>`;
     }
     tabsContainer.innerHTML = html;
   }
@@ -648,9 +648,9 @@
       const noThumb = !hasImg ? ' no-thumb' : '';
       const soldClass = m.sold ? ' sold' : '';
       return `
-        <div class="machine-card${noThumb}${soldClass}" onclick="${m.sold ? '' : `openDetail('${m.id}')`}">
+        <div class="machine-card\( {noThumb} \){soldClass}" onclick="\( {m.sold ? '' : `openDetail(' \){m.id}')`}">
           <div class="machine-thumb">
-            ${hasImg ? `<img src="${m.image_url}" alt="${m.id}" loading="lazy">` : `<span class="m-placeholder">🖥️</span>`}
+            \( {hasImg ? `<img src=" \){m.image_url}" alt="${m.id}" loading="lazy">` : `<span class="m-placeholder">🖥️</span>`}
           </div>
           <div class="machine-info">
             <div class="machine-name">${m.id}</div>
@@ -683,14 +683,14 @@
     document.getElementById('detail-min').textContent = m.minQty;
     document.getElementById('detail-max').textContent = m.maxQty;
 
-    const teamCalc = `${fmt(daily)}×10.00%×${m.lock}Days`;
+    const teamCalc = `\( {fmt(daily)}×10.00%× \){m.lock}Days`;
     document.getElementById('team-lv1').textContent = teamCalc;
     document.getElementById('team-lv2').textContent = teamCalc;
 
     // Hero image
     const hero = document.getElementById('detail-hero');
     if (m.image_url) {
-      hero.innerHTML = `<img src="${m.image_url}" alt="${m.id}">`;
+      hero.innerHTML = `<img src="\( {m.image_url}" alt=" \){m.id}">`;
     } else {
       hero.innerHTML = `<span class="hero-placeholder">🖥️</span>`;
     }
@@ -700,22 +700,27 @@
     document.getElementById('detail-page').classList.add('open');
     window.scrollTo(0, 0);
 
-    // Render nav on detail page too
+    // Render proper nav on detail page (fixed)
     const detailNav = document.getElementById('detail-bottom-nav');
-    if (detailNav && typeof renderNav === 'function') {
+    if (detailNav) {
       const pages = [
-        { id: 'home', label: 'Home', href: 'home.html' },
+        { id: 'home',   label: 'Home',   href: 'home.html' },
         { id: 'raffle', label: 'Raffle', href: 'raffle.html' },
-        { id: 'ai', label: 'AI', href: 'ai.html' },
+        { id: 'chat',   label: 'Chat',   href: 'chat.html' },
+        { id: 'ai',     label: 'AI',     href: 'ai.html' },
         { id: 'income', label: 'Income', href: 'income.html' },
-        { id: 'my', label: 'My', href: 'my.html' },
+        { id: 'my',     label: 'My',     href: 'my.html' },
       ];
+      
       detailNav.innerHTML = pages.map(p => `
-        <a href="${p.href}" class="nav-item${p.id === 'ai' ? ' active' : ''}">
-          <div class="nav-icon">${NAV_ICONS[p.id]}</div>
+        <a href="\( {p.href}" class="nav-item \){p.id === 'ai' ? ' active' : ''}">
+          <div class="nav-icon"><i data-lucide="${NAV_ICONS[p.id]}"></i></div>
           <span>${p.label}</span>
         </a>
       `).join('');
+
+      // Ensure Lucide icons render on the newly injected nav
+      ensureLucide(() => window.lucide.createIcons());
     }
   }
 
