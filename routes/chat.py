@@ -17,12 +17,21 @@ def chat_messages(current_user):
         for r in rows:
             r['created_at'] = r['created_at'].strftime('%Y-%m-%d %H:%M') if r['created_at'] else None
 
-        # Opening the chat marks the manager's replies as read.
+        # Fetch this user's assigned manager name + avatar for display in the chat header
+        manager_info = None
+        if current_user.get('assigned_manager_id'):
+            mgr = db.execute(
+                "SELECT name, avatar_url FROM admins WHERE id=?",
+                (current_user['assigned_manager_id'],)
+            ).fetchone()
+            if mgr:
+                manager_info = {'name': mgr['name'], 'avatar_url': mgr.get('avatar_url')}
+
         db.execute("UPDATE chat_messages SET read_by_user=TRUE WHERE user_id=? AND sender='admin'",
                    (current_user['id'],))
         db.commit()
 
-        return jsonify({'ok': True, 'messages': rows})
+        return jsonify({'ok': True, 'messages': rows, 'manager': manager_info})
     finally:
         db.close()
 
