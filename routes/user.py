@@ -105,6 +105,25 @@ def update_nick(current_user):
     finally:
         db.close()
 
+# ── POST /api/profile/avatar ──────────────────────────────────────────────────
+@user_bp.route('/profile/avatar', methods=['POST'])
+@login_required
+def update_avatar(current_user):
+    data      = request.get_json() or {}
+    avatar_url = (data.get('avatar_url') or '').strip()
+    # Accept either a data: URI (base64 upload) or a plain https URL
+    if not avatar_url:
+        return jsonify({'ok': False, 'error': 'No avatar URL provided'})
+    if not (avatar_url.startswith('data:image/') or avatar_url.startswith('https://')):
+        return jsonify({'ok': False, 'error': 'Invalid image format'})
+    db = get_db()
+    try:
+        db.execute("UPDATE users SET avatar_url=? WHERE id=?", (avatar_url, current_user['id']))
+        db.commit()
+        return jsonify({'ok': True})
+    finally:
+        db.close()
+
 # ── GET /api/messages ─────────────────────────────────────────────────────────
 @user_bp.route('/messages', methods=['GET'])
 @login_required
