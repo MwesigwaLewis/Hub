@@ -6,91 +6,119 @@
   <title>Future AI Hub — Income</title>
   <link rel="stylesheet" href="assets/shared.css">
   <style>
+    /* ── SUMMARY CARDS ── */
+    .summary-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; padding: 14px 12px 4px;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border-cyan);
+      border-radius: 10px; padding: 14px 12px;
+    }
+    .summary-lbl { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.3px; }
+    .summary-val { font-size: 20px; font-weight: 700; color: var(--cyan); }
+    .summary-val.green { color: #44ee88; }
+
     /* ── SECTION HEADING ── */
     .section-head {
-      padding: 14px 12px 6px;
-      font-size: 13px; font-weight: 700;
-      color: var(--cyan); letter-spacing: 0.5px;
+      padding: 16px 12px 6px;
+      font-size: 12px; font-weight: 700;
+      color: var(--cyan); letter-spacing: 0.8px;
       text-transform: uppercase;
     }
 
-    /* ── PURCHASED MACHINE CARD ── */
-    .owned-card {
+    /* ── MACHINE CARD ── */
+    .machine-card {
       margin: 0 10px 10px;
       background: var(--surface);
       border: 1px solid var(--border-cyan);
-      border-radius: 10px;
-      overflow: hidden;
+      border-radius: 10px; overflow: hidden;
     }
-    .owned-header {
+    .machine-header {
       display: flex; align-items: center;
       background: #001d3322; padding: 10px 14px;
-      border-bottom: 1px solid var(--border-cyan);
-      gap: 10px;
+      border-bottom: 1px solid var(--border-cyan); gap: 10px;
     }
-    .owned-thumb {
+    .machine-thumb {
       width: 44px; height: 44px; border-radius: 8px; object-fit: cover;
       background: #041220; border: 1px solid var(--border-cyan); flex-shrink: 0;
     }
-    .owned-name {
-      color: var(--cyan); font-size: 14px; font-weight: 700; flex: 1;
-    }
-    .owned-status {
+    .machine-name { color: var(--cyan); font-size: 14px; font-weight: 700; flex: 1; }
+    .machine-status {
       font-size: 11px; font-weight: 700;
-      padding: 3px 8px; border-radius: 20px;
+      padding: 3px 9px; border-radius: 20px;
     }
-    .status-running { background: #003322; color: #44ee88; border: 1px solid #33cc66; }
-    .status-expired { background: #220011; color: #ee4444; border: 1px solid #cc3333; }
-    .status-pending { background: #221100; color: #ffaa33; border: 1px solid #cc8800; }
+    .s-running { background:#003322; color:#44ee88; border:1px solid #33cc66; }
+    .s-expired { background:#220011; color:#ee4444; border:1px solid #cc3333; }
 
-    .owned-body {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 0;
+    .machine-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0;
     }
-    .owned-field {
+    .mf {
       padding: 10px 14px;
       border-right: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
     }
-    .owned-field:nth-child(even) { border-right: none; }
-    .owned-field:nth-last-child(-n+2) { border-bottom: none; }
-    .owned-field-lbl { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
-    .owned-field-val { font-size: 13px; color: #d0e8f8; font-weight: 600; }
-    .val-green { color: #44ee88; }
-    .val-cyan  { color: var(--cyan); }
+    .mf:nth-child(even) { border-right: none; }
+    .mf:nth-last-child(-n+2) { border-bottom: none; }
+    .mf-lbl { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+    .mf-val { font-size: 13px; color: #d0e8f8; font-weight: 600; }
+    .mf-val.g { color: #44ee88; }
+    .mf-val.c { color: var(--cyan); }
 
-    /* ── INCOME / TRANSACTION RECORD ── */
-    .income-item {
-      margin: 0 10px 8px;
-      background: var(--surface);
-      border: 1px solid #0d2233;
-      border-radius: 8px; padding: 13px;
-    }
-    .income-row {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 5px; font-size: 13px;
-    }
-    .income-row:last-child { margin-bottom: 0; }
-    .income-lbl { color: #3a5a7a; }
-    .income-val { color: var(--cyan); font-weight: 600; }
-    .income-pos { color: #44ee88; font-weight: 600; }
-    .income-neg { color: #ee4444; font-weight: 600; }
+    /* ── PROGRESS BAR ── */
+    .progress-wrap { padding: 10px 14px 12px; border-top: 1px solid var(--border); }
+    .progress-lbl { display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-bottom:6px; }
+    .progress-track { height:6px; background:#0a1e2e; border-radius:3px; overflow:hidden; }
+    .progress-fill  { height:100%; background: var(--cyan); border-radius:3px; transition:width 0.4s; }
 
     /* ── FILTER TABS ── */
     .filter-row {
-      display: flex; gap: 8px; padding: 12px 12px 4px;
+      display: flex; gap: 8px; padding: 4px 12px 8px;
       overflow-x: auto; scrollbar-width: none;
     }
     .filter-row::-webkit-scrollbar { display: none; }
     .filter-chip {
-      padding: 5px 12px; border-radius: 20px;
-      font-size: 12px; font-weight: 600;
+      padding: 5px 13px; border-radius: 20px; flex-shrink: 0;
+      font-size: 12px; font-weight: 600; cursor: pointer;
       background: var(--surface2); color: var(--text-muted);
-      border: 1px solid var(--border); cursor: pointer;
-      white-space: nowrap; flex-shrink: 0;
-      transition: all 0.2s;
+      border: 1px solid var(--border); transition: all 0.15s;
     }
     .filter-chip.active { background: var(--cyan); color: #fff; border-color: var(--cyan); }
+
+    /* ── TRANSACTION ROW ── */
+    .tx-item {
+      margin: 0 10px 6px;
+      background: var(--surface);
+      border: 1px solid #0d2233;
+      border-radius: 8px; padding: 12px 14px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .tx-icon {
+      width: 34px; height: 34px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .tx-body { flex: 1; min-width: 0; }
+    .tx-type { font-size: 13px; font-weight: 600; color: #c8e4f4; text-transform: capitalize; }
+    .tx-note { font-size: 11px; color: var(--text-muted); margin-top: 2px;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tx-right { text-align: right; flex-shrink: 0; }
+    .tx-amount { font-size: 14px; font-weight: 700; }
+    .tx-date   { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .amount-pos { color: #44ee88; }
+    .amount-neg { color: #ee4444; }
+
+    /* ── MORE BUTTON ── */
+    .more-btn {
+      display: block; margin: 4px 10px 16px;
+      padding: 11px; text-align: center;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; font-size: 13px; font-weight: 600;
+      color: var(--cyan); cursor: pointer;
+    }
+    .more-btn:active { opacity: 0.7; }
   </style>
 </head>
 <body>
@@ -102,131 +130,205 @@
   </div>
 
   <div class="scroll-area">
+
+    <!-- Summary cards -->
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="summary-lbl">AI Income</div>
+        <div class="summary-val" id="sum-ai">0.00</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-lbl">Today's Earnings</div>
+        <div class="summary-val green" id="sum-today">0.00</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-lbl">Team Income</div>
+        <div class="summary-val" id="sum-team">0.00</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-lbl">Total Deposited</div>
+        <div class="summary-val" id="sum-dep">0.00</div>
+      </div>
+    </div>
+
     <!-- My Machines -->
     <div class="section-head">My Machines</div>
     <div id="owned-list">
       <div class="empty-state"><div class="empty-icon">🖥️</div>No machines purchased yet</div>
     </div>
+    <div id="owned-more-btn"></div>
 
     <!-- Income Records -->
-    <div class="section-head" style="margin-top:8px">Income Records</div>
-    <div class="filter-row" id="filter-row">
-      <div class="filter-chip active" data-type="all" onclick="filterTx('all',this)">All</div>
-      <div class="filter-chip" data-type="ai_income" onclick="filterTx('ai_income',this)">AI Income</div>
-      <div class="filter-chip" data-type="deposit" onclick="filterTx('deposit',this)">Deposit</div>
-      <div class="filter-chip" data-type="withdraw" onclick="filterTx('withdraw',this)">Withdraw</div>
-      <div class="filter-chip" data-type="team" onclick="filterTx('team',this)">Team</div>
+    <div class="section-head" style="margin-top:4px">Transaction History</div>
+    <div class="filter-row">
+      <div class="filter-chip active" onclick="filterTx('all',this)">All</div>
+      <div class="filter-chip" onclick="filterTx('ai_income',this)">AI Income</div>
+      <div class="filter-chip" onclick="filterTx('deposit',this)">Deposit</div>
+      <div class="filter-chip" onclick="filterTx('withdraw',this)">Withdraw</div>
+      <div class="filter-chip" onclick="filterTx('team',this)">Team</div>
+      <div class="filter-chip" onclick="filterTx('admin_adjustment',this)">Adjustments</div>
     </div>
-    <div id="income-list">
-      <div class="empty-state"><div class="empty-icon">₿</div>No income records yet</div>
+    <div id="tx-list">
+      <div class="empty-state"><div class="empty-icon">₿</div>No records yet</div>
     </div>
-  </div>
+    <div id="tx-more-wrap"></div>
 
+  </div>
   <nav class="bottom-nav" id="bottom-nav"></nav>
 </div>
 
 <div class="toast" id="toast"></div>
-
 <script src="assets/nav.js"></script>
 <script>
   renderNav('income');
+  const fmt = n => Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 
-  const fmt = n => parseFloat(n||0).toFixed(2);
-  let allTx = [];
+  const TX_ICON = {
+    ai_income: {icon:'🤖', bg:'#001a2e'},
+    deposit:   {icon:'⬇️', bg:'#001a0a'},
+    withdraw:  {icon:'⬆️', bg:'#1a0000'},
+    team:      {icon:'👥', bg:'#0a0020'},
+    withdraw_refund:  {icon:'↩️', bg:'#1a1000'},
+    admin_adjustment: {icon:'⚙️', bg:'#0d0d0d'},
+  };
+
+  // ── MACHINES ──────────────────────────────────────────────────────────
+  const MACHINES_INITIAL = 3;
+  let allMachines = [];
 
   async function loadOwned() {
     try {
       const r = await fetch('/api/my-machines');
       const d = await r.json();
-      const box = document.getElementById('owned-list');
       if (!d.ok || !d.machines.length) return;
-      box.innerHTML = d.machines.map(m => {
-        const statusClass = m.status === 'running' ? 'status-running' : m.status === 'expired' ? 'status-expired' : 'status-pending';
-        const statusLabel = m.status === 'running' ? 'Running' : m.status === 'expired' ? 'Expired' : 'Pending';
-        const img = m.image_url || 'assets/images/A1_Machine.jpg';
-        return `
-          <div class="owned-card">
-            <div class="owned-header">
-              <img class="owned-thumb" src="${img}" alt="${m.machine_id}" onerror="this.style.visibility='hidden'">
-              <span class="owned-name">${m.machine_id}</span>
-              <span class="owned-status ${statusClass}">${statusLabel}</span>
-            </div>
-            <div class="owned-body">
-              <div class="owned-field">
-                <div class="owned-field-lbl">Purchase Price</div>
-                <div class="owned-field-val">${Number(m.price).toLocaleString()}.00</div>
-              </div>
-              <div class="owned-field">
-                <div class="owned-field-lbl">Lock Period</div>
-                <div class="owned-field-val">${m.lock} Days</div>
-              </div>
-              <div class="owned-field">
-                <div class="owned-field-lbl">Total Income</div>
-                <div class="owned-field-val val-cyan">${fmt(m.total_income)}</div>
-              </div>
-              <div class="owned-field">
-                <div class="owned-field-lbl">Approx. Daily</div>
-                <div class="owned-field-val val-green">${fmt(m.daily_income)}</div>
-              </div>
-              <div class="owned-field">
-                <div class="owned-field-lbl">Earned So Far</div>
-                <div class="owned-field-val val-green">${fmt(m.earned)}</div>
-              </div>
-              <div class="owned-field">
-                <div class="owned-field-lbl">Start Date</div>
-                <div class="owned-field-val">${m.start_date || '—'}</div>
-              </div>
-              <div class="owned-field">
-                <div class="owned-field-lbl">End Date</div>
-                <div class="owned-field-val">${m.end_date || '—'}</div>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join('');
+      allMachines = d.machines;
+      renderMachines(MACHINES_INITIAL);
     } catch(e) {}
   }
+
+  function renderMachines(showCount) {
+    const box = document.getElementById('owned-list');
+    const toShow = allMachines.slice(0, showCount);
+    box.innerHTML = toShow.map(m => {
+      const pct = m.total_income > 0 ? Math.min(100, (m.earned / m.total_income) * 100) : 0;
+      const statusCls = m.status === 'running' ? 's-running' : 's-expired';
+      const statusLbl = m.status === 'running' ? 'Running' : 'Expired';
+      return `
+        <div class="machine-card">
+          <div class="machine-header">
+            <img class="machine-thumb" src="${m.image_url||'assets/images/A1_Machine.jpg'}"
+                 alt="${m.machine_id}" onerror="this.style.visibility='hidden'">
+            <span class="machine-name">${m.machine_id}</span>
+            <span class="machine-status ${statusCls}">${statusLbl}</span>
+          </div>
+          <div class="machine-grid">
+            <div class="mf"><div class="mf-lbl">Purchase Price</div><div class="mf-val">${fmt(m.price)}</div></div>
+            <div class="mf"><div class="mf-lbl">Lock Period</div><div class="mf-val">${m.lock} Days</div></div>
+            <div class="mf"><div class="mf-lbl">Total Income</div><div class="mf-val c">${fmt(m.total_income)}</div></div>
+            <div class="mf"><div class="mf-lbl">Daily Approx.</div><div class="mf-val g">${fmt(m.daily_income)}</div></div>
+            <div class="mf"><div class="mf-lbl">Earned</div><div class="mf-val g">${fmt(m.earned)}</div></div>
+            <div class="mf"><div class="mf-lbl">Expires</div><div class="mf-val">${m.end_date||'—'}</div></div>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-lbl"><span>Progress</span><span>${pct.toFixed(1)}%</span></div>
+            <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+          </div>
+        </div>`;
+    }).join('');
+
+    const moreWrap = document.getElementById('owned-more-btn');
+    if (allMachines.length > showCount) {
+      moreWrap.innerHTML = `<div class="more-btn" onclick="renderMachines(${showCount + MACHINES_INITIAL})">
+        Show More (${allMachines.length - showCount} remaining)
+      </div>`;
+    } else {
+      moreWrap.innerHTML = '';
+    }
+  }
+
+  // ── TRANSACTIONS ──────────────────────────────────────────────────────
+  const TX_INITIAL = 10;
+  const TX_STEP    = 10;
+  let allTx        = [];
+  let filteredTx   = [];
+  let shownTx      = TX_INITIAL;
 
   async function loadTransactions() {
     try {
       const r = await fetch('/api/transactions');
       const d = await r.json();
-      if (d.ok) { allTx = d.transactions; renderTx('all'); }
+      if (d.ok) { allTx = d.transactions; filteredTx = allTx; renderTx(); }
     } catch(e) {}
   }
 
   function filterTx(type, el) {
     document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
     el.classList.add('active');
-    renderTx(type);
+    filteredTx = type === 'all' ? allTx : allTx.filter(t => t.type === type);
+    shownTx = TX_INITIAL;
+    renderTx();
   }
 
-  function renderTx(type) {
-    const list = document.getElementById('income-list');
-    const items = type === 'all' ? allTx : allTx.filter(t => t.type === type);
-    if (!items.length) {
+  function renderTx() {
+    const list = document.getElementById('tx-list');
+    const moreWrap = document.getElementById('tx-more-wrap');
+    if (!filteredTx.length) {
       list.innerHTML = '<div class="empty-state"><div class="empty-icon">₿</div>No records for this filter</div>';
+      moreWrap.innerHTML = '';
       return;
     }
-    list.innerHTML = items.map(t => {
-      const cls  = parseFloat(t.amount) >= 0 ? 'income-pos' : 'income-neg';
-      const sign = parseFloat(t.amount) >= 0 ? '+' : '';
-      const dt   = (t.created_at || '').split(' ')[0];
+    const toShow = filteredTx.slice(0, shownTx);
+    list.innerHTML = toShow.map(t => {
+      const pos    = parseFloat(t.amount) >= 0;
+      const meta   = TX_ICON[t.type] || {icon:'💰', bg:'#0a0a0a'};
+      const label  = (t.type||'').replace(/_/g,' ');
+      const date   = (t.created_at||'').split(' ')[0];
       return `
-        <div class="income-item">
-          <div class="income-row"><span class="income-lbl">Type</span><span class="income-val">${t.type}</span></div>
-          ${t.machine_id ? `<div class="income-row"><span class="income-lbl">Machine</span><span>${t.machine_id}</span></div>` : ''}
-          <div class="income-row"><span class="income-lbl">Amount</span><span class="${cls}">${sign}${fmt(t.amount)}</span></div>
-          <div class="income-row"><span class="income-lbl">Date</span><span style="color:#5a7a99">${dt}</span></div>
-          ${t.note ? `<div class="income-row"><span class="income-lbl">Note</span><span style="color:#3a5a6a;font-size:12px">${t.note}</span></div>` : ''}
-        </div>
-      `;
+        <div class="tx-item">
+          <div class="tx-icon" style="background:${meta.bg}">${meta.icon}</div>
+          <div class="tx-body">
+            <div class="tx-type">${label}</div>
+            ${t.note ? `<div class="tx-note">${t.note}</div>` : ''}
+          </div>
+          <div class="tx-right">
+            <div class="tx-amount ${pos ? 'amount-pos':'amount-neg'}">${pos?'+':''}${fmt(t.amount)}</div>
+            <div class="tx-date">${date}</div>
+          </div>
+        </div>`;
     }).join('');
+
+    if (filteredTx.length > shownTx) {
+      const rem = filteredTx.length - shownTx;
+      moreWrap.innerHTML = `<div class="more-btn" onclick="loadMore()">
+        Show More (${rem} remaining)
+      </div>`;
+    } else {
+      moreWrap.innerHTML = '';
+    }
   }
 
+  function loadMore() {
+    shownTx += TX_STEP;
+    renderTx();
+  }
+
+  // ── SUMMARY ───────────────────────────────────────────────────────────
+  async function loadSummary() {
+    try {
+      const r = await fetch('/api/me');
+      const d = await r.json();
+      if (!d.ok) return;
+      const u = d.user;
+      document.getElementById('sum-ai').textContent    = fmt(u.ai_income);
+      document.getElementById('sum-today').textContent = fmt(u.today_earnings);
+      document.getElementById('sum-team').textContent  = fmt(u.team_income);
+      document.getElementById('sum-dep').textContent   = fmt(u.total_deposit);
+    } catch(e) {}
+  }
+
+  loadSummary();
   loadOwned();
   loadTransactions();
 </script>
 </body>
-        </html>
-  
+</html>
