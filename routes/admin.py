@@ -31,6 +31,22 @@ NUMERIC_MACHINE_FIELDS = {'price', 'income', 'lock', 'sold'}
 USER_MACHINE_EDITABLE_FIELDS = {'daily_income', 'total_income', 'earned', 'status', 'expires_at'}
 
 
+def _admin_can_access_user(db, current_admin, user_id):
+    """
+    True if current_admin is allowed to view/modify this user.
+    'super' can touch anyone. A regular 'manager' can only touch users
+    assigned to their own batch (users.assigned_manager_id).
+    """
+    if current_admin['role'] == 'super':
+        return True
+    row = db.execute("SELECT assigned_manager_id FROM users WHERE id=?", (user_id,)).fetchone()
+    return bool(row) and row['assigned_manager_id'] == current_admin['id']
+
+
+def _scope_denied():
+    return jsonify({'ok': False, 'error': "This user isn't in your batch"}), 403
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # AUTH
 # ══════════════════════════════════════════════════════════════════════════
@@ -75,7 +91,11 @@ def admin_logout():
 @admin_bp.route('/me', methods=['GET'])
 @admin_login_required
 def admin_me(current_admin):
-    return jsonify({'ok': True, 'id': current_admin['id'], 'username': current_admin['username'], 'name': current_admin['name']})
+    return jsonify({
+        'ok': True, 'id': current_admin['id'], 'username': current_admin['username'],
+        'name': current_admin['name'], 'role': current_admin['role'],
+        'is_super': current_admin['role'] == 'super', 'manager_code': current_admin['manager_code'],
+    })
 
 @admin_bp.route('/change-password', methods=['POST'])
 @admin_login_required
@@ -101,8 +121,11 @@ def admin_change_password(current_admin):
 
 # ══════════════════════════════════════════════════════════════════════════
 # MANAGERS — any logged-in manager can create/list/remove other managers.
-# There's no separate "super-admin" tier: whoever has the seeded/first
-# account can bootstrap the rest, then it's peer-to-peer from there.
+# 'role' distinguishes 'super' (sees/manages every batch, can reassign users
+# between managers) from 'manager' (scoped to their own assigned users).
+# Only an existing 'super' can grant the 'super' role to a new account —
+# a regular manager creating another manager always gets role='manager',
+# regardless of what's in the request, so nobody can self-escalate.
 # ══════════════════════════════════════════════════════════════════════════
 
 @admin_bp.route('/admins', methods=['GET'])
@@ -110,7 +133,11 @@ def admin_change_password(current_admin):
 def list_admins(current_admin):
     db = get_db()
     try:
-        rows = db.execute("SELECT id, username, name, created_at FROM admins ORDER BY created_at ASC").fetchall()
+        rows = db.execute("""
+            SELECT a.id, a.username, a.name, a.role, a.manager_code, a.created_at,
+                   (SELECT COUNT(*) FROM users u WHERE u.assigned_manager_id = a.id) AS batch_size
+            FROM admins a ORDER BY a.created_at ASC
+        """).fetchall()
         for r in rows:
             r['created_at'] = r['created_at'].strftime('%Y-%m-%d') if r['created_at'] else None
             r['is_you'] = (r['id'] == current_admin['id'])
@@ -125,6 +152,7 @@ def create_admin(current_admin):
     username = (data.get('username') or '').strip()
     password = (data.get('password') or '').strip()
     name     = (data.get('name') or 'Manager').strip()
+    role     = 'super' if (data.get('role') == 'super' and current_admin['role'] == 'super') else 'manager'
 
     if not username or not password:
         return jsonify({'ok': False, 'error': 'Username and password are required'})
@@ -138,8 +166,8 @@ def create_admin(current_admin):
             return jsonify({'ok': False, 'error': 'That username is already taken'})
 
         db.execute(
-            "INSERT INTO admins (username, password, name) VALUES (?, ?, ?)",
-            (username, generate_password_hash(password), name)
+            "INSERT INTO admins (username, password, name, role, manager_code) VALUES (?, ?, ?, ?, ?)",
+            (username, generate_password_hash(password), name, role, secrets.token_hex(4).upper())
         )
         db.commit()
         return jsonify({'ok': True})
@@ -159,6 +187,8 @@ def delete_admin(current_admin, admin_id):
             return jsonify({'ok': False, 'error': 'Cannot remove the last remaining manager account'})
 
         db.execute("DELETE FROM admin_sessions WHERE admin_id=?", (admin_id,))
+        db.execute("UPDATE users SET assigned_manager_id=NULL WHERE assigned_manager_id=?", (admin_id,))
+        db.execute("UPDATE reward_codes SET created_by=NULL WHERE created_by=?", (admin_id,))
         result = db.execute("DELETE FROM admins WHERE id=?", (admin_id,))
         if result.rowcount == 0:
             db.rollback()
@@ -178,17 +208,45 @@ def delete_admin(current_admin, admin_id):
 def admin_stats(current_admin):
     db = get_db()
     try:
-        users_count       = db.execute("SELECT COUNT(*) AS c FROM users").fetchone()['c']
-        total_deposits     = db.execute("SELECT COALESCE(SUM(amount),0) AS s FROM deposit_transactions WHERE status='successful'").fetchone()['s']
-        total_withdrawn    = db.execute("SELECT COALESCE(SUM(amount),0) AS s FROM withdraw_requests WHERE status='approved'").fetchone()['s']
-        pending_withdraws  = db.execute("SELECT COUNT(*) AS c FROM withdraw_requests WHERE status='pending'").fetchone()['c']
-        unread_chats       = db.execute("""
-            SELECT COUNT(DISTINCT user_id) AS c FROM chat_messages
-            WHERE sender='user' AND read_by_admin=FALSE
-        """).fetchone()['c']
+        is_super = current_admin['role'] == 'super'
+        mgr_id = current_admin['id']
+
+        if is_super:
+            users_count = db.execute("SELECT COUNT(*) AS c FROM users").fetchone()['c']
+            total_deposits = db.execute("SELECT COALESCE(SUM(amount),0) AS s FROM deposit_transactions WHERE status='successful'").fetchone()['s']
+            total_withdrawn = db.execute("SELECT COALESCE(SUM(amount),0) AS s FROM withdraw_requests WHERE status='approved'").fetchone()['s']
+            pending_withdraws = db.execute("SELECT COUNT(*) AS c FROM withdraw_requests WHERE status='pending'").fetchone()['c']
+            unread_chats = db.execute("""
+                SELECT COUNT(DISTINCT user_id) AS c FROM chat_messages
+                WHERE sender='user' AND read_by_admin=FALSE
+            """).fetchone()['c']
+        else:
+            users_count = db.execute(
+                "SELECT COUNT(*) AS c FROM users WHERE assigned_manager_id=?", (mgr_id,)).fetchone()['c']
+            total_deposits = db.execute("""
+                SELECT COALESCE(SUM(d.amount),0) AS s FROM deposit_transactions d
+                JOIN users u ON u.id = d.user_id
+                WHERE d.status='successful' AND u.assigned_manager_id=?
+            """, (mgr_id,)).fetchone()['s']
+            total_withdrawn = db.execute("""
+                SELECT COALESCE(SUM(w.amount),0) AS s FROM withdraw_requests w
+                JOIN users u ON u.id = w.user_id
+                WHERE w.status='approved' AND u.assigned_manager_id=?
+            """, (mgr_id,)).fetchone()['s']
+            pending_withdraws = db.execute("""
+                SELECT COUNT(*) AS c FROM withdraw_requests w
+                JOIN users u ON u.id = w.user_id
+                WHERE w.status='pending' AND u.assigned_manager_id=?
+            """, (mgr_id,)).fetchone()['c']
+            unread_chats = db.execute("""
+                SELECT COUNT(DISTINCT cm.user_id) AS c FROM chat_messages cm
+                JOIN users u ON u.id = cm.user_id
+                WHERE cm.sender='user' AND cm.read_by_admin=FALSE AND u.assigned_manager_id=?
+            """, (mgr_id,)).fetchone()['c']
 
         return jsonify({
             'ok': True,
+            'is_super': is_super,
             'users_count': users_count,
             'total_deposits': total_deposits,
             'total_withdrawn': total_withdrawn,
@@ -207,22 +265,36 @@ def admin_stats(current_admin):
 @admin_bp.route('/users', methods=['GET'])
 @admin_login_required
 def admin_users(current_admin):
-    search = (request.args.get('search') or '').strip()
-    limit  = min(int(request.args.get('limit', 50)), 200)
-    offset = int(request.args.get('offset', 0))
+    search  = (request.args.get('search') or '').strip()
+    limit   = min(int(request.args.get('limit', 50)), 200)
+    offset  = int(request.args.get('offset', 0))
+    # Supers can filter by a specific manager's batch, or pass
+    # manager=unassigned to find users nobody's been assigned to yet.
+    manager_filter = request.args.get('manager', '').strip()
 
     db = get_db()
     try:
         base = """SELECT id, phone, nick, balance, wallet, total_deposit, total_withdraw,
-                          ai_income, invite_count, vip_level, created_at
+                          ai_income, invite_count, vip_level, assigned_manager_id, created_at
                    FROM users"""
+        where = []
+        params = []
+
         if search:
-            rows = db.execute(
-                base + " WHERE phone ILIKE ? OR nick ILIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                (f'%{search}%', f'%{search}%', limit, offset)
-            ).fetchall()
-        else:
-            rows = db.execute(base + " ORDER BY created_at DESC LIMIT ? OFFSET ?", (limit, offset)).fetchall()
+            where.append("(phone ILIKE ? OR nick ILIKE ?)")
+            params += [f'%{search}%', f'%{search}%']
+
+        if current_admin['role'] != 'super':
+            where.append("assigned_manager_id = ?")
+            params.append(current_admin['id'])
+        elif manager_filter == 'unassigned':
+            where.append("assigned_manager_id IS NULL")
+        elif manager_filter:
+            where.append("assigned_manager_id = ?")
+            params.append(int(manager_filter))
+
+        query = base + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        rows = db.execute(query, tuple(params + [limit, offset])).fetchall()
 
         for r in rows:
             r['created_at'] = r['created_at'].strftime('%Y-%m-%d') if r['created_at'] else None
@@ -235,6 +307,9 @@ def admin_users(current_admin):
 def admin_user_detail(current_admin, user_id):
     db = get_db()
     try:
+        if not _admin_can_access_user(db, current_admin, user_id):
+            return _scope_denied()
+
         user = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         if not user:
             return jsonify({'ok': False, 'error': 'User not found'})
@@ -281,6 +356,9 @@ def admin_update_user(current_admin, user_id):
 
     db = get_db()
     try:
+        if not _admin_can_access_user(db, current_admin, user_id):
+            return _scope_denied()
+
         try:
             result = db.execute(f"UPDATE users SET {set_clause} WHERE id=?", tuple(params))
         except Exception as e:
@@ -295,6 +373,34 @@ def admin_update_user(current_admin, user_id):
         if 'depositing_invites' in updates and 'vip_level' not in updates:
             recompute_vip_level(db, user_id)
 
+        db.commit()
+        return jsonify({'ok': True})
+    finally:
+        db.close()
+
+@admin_bp.route('/users/<int:user_id>/reassign', methods=['POST'])
+@admin_login_required
+def admin_reassign_user(current_admin, user_id):
+    """Move a user to a different manager's batch. Super-only — a regular
+    manager reassigning their own users away (or poaching another's) without
+    oversight isn't something a scoped account should be able to do."""
+    if current_admin['role'] != 'super':
+        return jsonify({'ok': False, 'error': 'Only a super manager can reassign users'}), 403
+
+    data = request.get_json() or {}
+    new_manager_id = data.get('manager_id')  # null/None is valid — unassigns
+
+    db = get_db()
+    try:
+        if new_manager_id is not None:
+            mgr = db.execute("SELECT id FROM admins WHERE id=?", (new_manager_id,)).fetchone()
+            if not mgr:
+                return jsonify({'ok': False, 'error': 'Manager not found'})
+
+        result = db.execute("UPDATE users SET assigned_manager_id=? WHERE id=?", (new_manager_id, user_id))
+        if result.rowcount == 0:
+            db.rollback()
+            return jsonify({'ok': False, 'error': 'User not found'})
         db.commit()
         return jsonify({'ok': True})
     finally:
@@ -321,6 +427,9 @@ def admin_adjust_balance(current_admin, user_id):
 
     db = get_db()
     try:
+        if not _admin_can_access_user(db, current_admin, user_id):
+            return _scope_denied()
+
         result = db.execute("UPDATE users SET balance=balance+? WHERE id=?", (amount, user_id))
         if result.rowcount == 0:
             db.rollback()
@@ -344,6 +453,9 @@ def admin_reset_password(current_admin, user_id):
 
     db = get_db()
     try:
+        if not _admin_can_access_user(db, current_admin, user_id):
+            return _scope_denied()
+
         result = db.execute("UPDATE users SET password=? WHERE id=?",
                              (generate_password_hash(new_password), user_id))
         if result.rowcount == 0:
@@ -367,6 +479,9 @@ def admin_delete_user(current_admin, user_id):
     """
     db = get_db()
     try:
+        if not _admin_can_access_user(db, current_admin, user_id):
+            return _scope_denied()
+
         user = db.execute("SELECT id FROM users WHERE id=?", (user_id,)).fetchone()
         if not user:
             return jsonify({'ok': False, 'error': 'User not found'})
@@ -507,6 +622,12 @@ def admin_update_user_machine(current_admin, um_id):
 
     db = get_db()
     try:
+        owner = db.execute("SELECT user_id FROM user_machines WHERE id=?", (um_id,)).fetchone()
+        if not owner:
+            return jsonify({'ok': False, 'error': 'Purchase not found'})
+        if not _admin_can_access_user(db, current_admin, owner['user_id']):
+            return _scope_denied()
+
         result = db.execute(f"UPDATE user_machines SET {set_clause} WHERE id=?", tuple(params))
         if result.rowcount == 0:
             db.rollback()
@@ -527,14 +648,24 @@ def admin_withdrawals(current_admin):
     status = request.args.get('status', 'pending')
     db = get_db()
     try:
-        rows = db.execute("""
-            SELECT w.id, w.user_id, w.amount, w.status, w.created_at, w.processed_at,
-                   u.phone, u.nick
-            FROM withdraw_requests w
-            JOIN users u ON u.id = w.user_id
-            WHERE w.status = ?
-            ORDER BY w.created_at ASC
-        """, (status,)).fetchall()
+        if current_admin['role'] == 'super':
+            rows = db.execute("""
+                SELECT w.id, w.user_id, w.amount, w.status, w.created_at, w.processed_at,
+                       u.phone, u.nick
+                FROM withdraw_requests w
+                JOIN users u ON u.id = w.user_id
+                WHERE w.status = ?
+                ORDER BY w.created_at ASC
+            """, (status,)).fetchall()
+        else:
+            rows = db.execute("""
+                SELECT w.id, w.user_id, w.amount, w.status, w.created_at, w.processed_at,
+                       u.phone, u.nick
+                FROM withdraw_requests w
+                JOIN users u ON u.id = w.user_id
+                WHERE w.status = ? AND u.assigned_manager_id = ?
+                ORDER BY w.created_at ASC
+            """, (status, current_admin['id'])).fetchall()
         for r in rows:
             r['created_at'] = r['created_at'].strftime('%Y-%m-%d %H:%M') if r['created_at'] else None
             r['processed_at'] = r['processed_at'].strftime('%Y-%m-%d %H:%M') if r['processed_at'] else None
@@ -547,6 +678,12 @@ def admin_withdrawals(current_admin):
 def approve_withdrawal(current_admin, withdraw_id):
     db = get_db()
     try:
+        w = db.execute("SELECT user_id FROM withdraw_requests WHERE id=?", (withdraw_id,)).fetchone()
+        if not w:
+            return jsonify({'ok': False, 'error': 'Withdrawal not found'})
+        if not _admin_can_access_user(db, current_admin, w['user_id']):
+            return _scope_denied()
+
         result = db.execute(
             "UPDATE withdraw_requests SET status='approved', processed_at=NOW() WHERE id=? AND status='pending'",
             (withdraw_id,)
@@ -567,6 +704,8 @@ def reject_withdrawal(current_admin, withdraw_id):
         w = db.execute("SELECT * FROM withdraw_requests WHERE id=? AND status='pending'", (withdraw_id,)).fetchone()
         if not w:
             return jsonify({'ok': False, 'error': 'Withdrawal not found or already processed'})
+        if not _admin_can_access_user(db, current_admin, w['user_id']):
+            return _scope_denied()
 
         db.execute("UPDATE withdraw_requests SET status='rejected', processed_at=NOW() WHERE id=?", (withdraw_id,))
         db.execute("UPDATE users SET balance=balance+?, total_withdraw=total_withdraw-? WHERE id=?",
@@ -593,18 +732,21 @@ def admin_deposits(current_admin):
     status = request.args.get('status', '')
     db = get_db()
     try:
+        where = []
+        params = []
         if status:
-            rows = db.execute("""
-                SELECT d.*, u.phone, u.nick FROM deposit_transactions d
-                JOIN users u ON u.id = d.user_id
-                WHERE d.status=? ORDER BY d.created_at DESC LIMIT 100
-            """, (status,)).fetchall()
-        else:
-            rows = db.execute("""
-                SELECT d.*, u.phone, u.nick FROM deposit_transactions d
-                JOIN users u ON u.id = d.user_id
-                ORDER BY d.created_at DESC LIMIT 100
-            """).fetchall()
+            where.append("d.status=?")
+            params.append(status)
+        if current_admin['role'] != 'super':
+            where.append("u.assigned_manager_id=?")
+            params.append(current_admin['id'])
+
+        query = """
+            SELECT d.*, u.phone, u.nick FROM deposit_transactions d
+            JOIN users u ON u.id = d.user_id
+        """ + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY d.created_at DESC LIMIT 100"
+        rows = db.execute(query, tuple(params)).fetchall()
+
         for r in rows:
             r['created_at'] = r['created_at'].strftime('%Y-%m-%d %H:%M') if r['created_at'] else None
             r['verified_at'] = r['verified_at'].strftime('%Y-%m-%d %H:%M') if r['verified_at'] else None
@@ -622,6 +764,12 @@ def admin_update_deposit_status(current_admin, deposit_id):
 
     db = get_db()
     try:
+        dep = db.execute("SELECT user_id FROM deposit_transactions WHERE id=?", (deposit_id,)).fetchone()
+        if not dep:
+            return jsonify({'ok': False, 'error': 'Deposit not found'})
+        if not _admin_can_access_user(db, current_admin, dep['user_id']):
+            return _scope_denied()
+
         result = db.execute("UPDATE deposit_transactions SET status=? WHERE id=?", (status, deposit_id))
         if result.rowcount == 0:
             db.rollback()
@@ -815,18 +963,33 @@ def admin_delete_reward_code(current_admin, code_id):
 def admin_chat_conversations(current_admin):
     db = get_db()
     try:
-        rows = db.execute("""
-            SELECT DISTINCT ON (cm.user_id)
-                   cm.user_id, u.phone, u.nick, cm.body AS last_message,
-                   cm.sender AS last_sender, cm.created_at AS last_at,
-                   EXISTS (
-                       SELECT 1 FROM chat_messages x
-                       WHERE x.user_id = cm.user_id AND x.sender='user' AND x.read_by_admin=FALSE
-                   ) AS unread
-            FROM chat_messages cm
-            JOIN users u ON u.id = cm.user_id
-            ORDER BY cm.user_id, cm.created_at DESC
-        """).fetchall()
+        if current_admin['role'] == 'super':
+            rows = db.execute("""
+                SELECT DISTINCT ON (cm.user_id)
+                       cm.user_id, u.phone, u.nick, cm.body AS last_message,
+                       cm.sender AS last_sender, cm.created_at AS last_at,
+                       EXISTS (
+                           SELECT 1 FROM chat_messages x
+                           WHERE x.user_id = cm.user_id AND x.sender='user' AND x.read_by_admin=FALSE
+                       ) AS unread
+                FROM chat_messages cm
+                JOIN users u ON u.id = cm.user_id
+                ORDER BY cm.user_id, cm.created_at DESC
+            """).fetchall()
+        else:
+            rows = db.execute("""
+                SELECT DISTINCT ON (cm.user_id)
+                       cm.user_id, u.phone, u.nick, cm.body AS last_message,
+                       cm.sender AS last_sender, cm.created_at AS last_at,
+                       EXISTS (
+                           SELECT 1 FROM chat_messages x
+                           WHERE x.user_id = cm.user_id AND x.sender='user' AND x.read_by_admin=FALSE
+                       ) AS unread
+                FROM chat_messages cm
+                JOIN users u ON u.id = cm.user_id
+                WHERE u.assigned_manager_id = ?
+                ORDER BY cm.user_id, cm.created_at DESC
+            """, (current_admin['id'],)).fetchall()
         rows.sort(key=lambda r: r['last_at'], reverse=True)
         for r in rows:
             r['last_at'] = r['last_at'].strftime('%Y-%m-%d %H:%M') if r['last_at'] else None
@@ -839,6 +1002,9 @@ def admin_chat_conversations(current_admin):
 def admin_chat_thread(current_admin, user_id):
     db = get_db()
     try:
+        if not _admin_can_access_user(db, current_admin, user_id):
+            return _scope_denied()
+
         rows = db.execute(
             "SELECT id, sender, body, created_at FROM chat_messages WHERE user_id=? ORDER BY created_at ASC",
             (user_id,)
@@ -863,6 +1029,9 @@ def admin_chat_send(current_admin, user_id):
 
     db = get_db()
     try:
+        if not _admin_can_access_user(db, current_admin, user_id):
+            return _scope_denied()
+
         user = db.execute("SELECT id FROM users WHERE id=?", (user_id,)).fetchone()
         if not user:
             return jsonify({'ok': False, 'error': 'User not found'})
