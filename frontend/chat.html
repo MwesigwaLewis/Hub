@@ -65,10 +65,15 @@
 <div class="dot-bg"></div>
 
 <div class="page chat-page">
-  <div class="app-bar">
+  <div class="app-bar" style="gap:10px;">
     <a href="my.html" class="back-btn">‹</a>
-    <span class="app-bar-title">Manager</span>
-    <span style="width:40px"></span>
+    <img id="mgr-avatar" src="" alt=""
+         style="width:34px;height:34px;border-radius:50%;object-fit:cover;
+                border:2px solid var(--cyan);display:none;flex-shrink:0;">
+    <div style="flex:1;min-width:0;">
+      <div class="app-bar-title" id="mgr-name" style="font-size:15px;">Manager</div>
+      <div id="mgr-sub" style="font-size:11px;color:var(--text-muted);display:none;">Support</div>
+    </div>
   </div>
 
   <div class="chat-scroll" id="chat-scroll">
@@ -139,6 +144,17 @@
       const r = await fetch('/api/chat/messages');
       const d = await r.json();
       if (!d.ok) { window.location.href = 'index.html'; return; }
+      // Show manager name + avatar in header
+      if (d.manager) {
+        document.getElementById('mgr-name').textContent = d.manager.name || 'Manager';
+        const sub = document.getElementById('mgr-sub');
+        sub.style.display = 'block';
+        const av = document.getElementById('mgr-avatar');
+        if (d.manager.avatar_url) {
+          av.src = d.manager.avatar_url;
+          av.style.display = 'block';
+        }
+      }
       renderMessages(d.messages);
     } catch (e) { /* silent — keep polling */ }
   }
