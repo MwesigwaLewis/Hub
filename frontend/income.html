@@ -28,6 +28,10 @@
       border-bottom: 1px solid var(--border-cyan);
       gap: 10px;
     }
+    .owned-thumb {
+      width: 44px; height: 44px; border-radius: 8px; object-fit: cover;
+      background: #041220; border: 1px solid var(--border-cyan); flex-shrink: 0;
+    }
     .owned-name {
       color: var(--cyan); font-size: 14px; font-weight: 700; flex: 1;
     }
@@ -139,9 +143,11 @@
       box.innerHTML = d.machines.map(m => {
         const statusClass = m.status === 'running' ? 'status-running' : m.status === 'expired' ? 'status-expired' : 'status-pending';
         const statusLabel = m.status === 'running' ? 'Running' : m.status === 'expired' ? 'Expired' : 'Pending';
+        const img = m.image_url || 'assets/images/A1_Machine.jpg';
         return `
           <div class="owned-card">
             <div class="owned-header">
+              <img class="owned-thumb" src="${img}" alt="${m.machine_id}" onerror="this.style.visibility='hidden'">
               <span class="owned-name">${m.machine_id}</span>
               <span class="owned-status ${statusClass}">${statusLabel}</span>
             </div>
@@ -159,8 +165,12 @@
                 <div class="owned-field-val val-cyan">${fmt(m.total_income)}</div>
               </div>
               <div class="owned-field">
-                <div class="owned-field-lbl">Daily Earn</div>
+                <div class="owned-field-lbl">Approx. Daily</div>
                 <div class="owned-field-val val-green">${fmt(m.daily_income)}</div>
+              </div>
+              <div class="owned-field">
+                <div class="owned-field-lbl">Earned So Far</div>
+                <div class="owned-field-val val-green">${fmt(m.earned)}</div>
               </div>
               <div class="owned-field">
                 <div class="owned-field-lbl">Start Date</div>
@@ -218,4 +228,5 @@
   loadTransactions();
 </script>
 </body>
-</html>
+        </html>
+  
