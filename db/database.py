@@ -304,6 +304,9 @@ def init_db():
     # Manager profile picture + cross-visibility grant from super
     cur.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS avatar_url TEXT")
     cur.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS can_see_all BOOLEAN NOT NULL DEFAULT FALSE")
+    # Group chat customisation — manager sets their group name and can toggle it on/off
+    cur.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS group_name TEXT")
+    cur.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS group_enabled BOOLEAN NOT NULL DEFAULT TRUE")
     # Activity audit log — every non-super admin action, visible only to super
     cur.execute("""
         CREATE TABLE IF NOT EXISTS admin_activity_log (
