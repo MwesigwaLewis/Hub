@@ -151,6 +151,7 @@
 
 <div class="tabs">
   <div class="tab-btn active" data-tab="inbox">Inbox <span id="tab-unread-badge"></span></div>
+  <div class="tab-btn" data-tab="group-broadcast">Group Broadcast</div>
   <div class="tab-btn" data-tab="withdrawals">Withdrawals</div>
   <div class="tab-btn" data-tab="users">Users</div>
   <div class="tab-btn" data-tab="machines">Machines</div>
@@ -166,6 +167,20 @@
 <div class="tab-panel active" id="panel-inbox">
   <div id="conv-list"><div class="empty-state">No conversations yet</div></div>
   <button class="load-more-btn" id="inbox-load-more" style="display:none" onclick="loadConversations(true)">Load More</button>
+</div>
+
+<!-- GROUP BROADCAST -->
+<div class="tab-panel" id="panel-group-broadcast">
+  <div style="padding:10px 14px 6px;font-size:12px;color:var(--text-muted);">
+    Messages here are sent to <strong>all your members</strong> as a read-only broadcast. Use it for announcements, updates, or alerts to your whole team.
+  </div>
+  <div id="group-chat-scroll" style="display:flex;flex-direction:column;gap:8px;padding:8px 10px;max-height:50vh;overflow-y:auto;">
+    <div class="empty-state" id="group-chat-empty">No group messages yet</div>
+  </div>
+  <div style="display:flex;gap:8px;padding:10px;border-top:1px solid var(--border);">
+    <textarea id="group-chat-input" class="field" style="flex:1;resize:none;min-height:40px;max-height:100px;border-radius:10px;padding:10px 14px;" placeholder="Broadcast a message to your team…" rows="1"></textarea>
+    <button class="btn" onclick="sendGroupMessage()" style="align-self:flex-end;padding:10px 16px;">Send</button>
+  </div>
 </div>
 
 <!-- WITHDRAWALS -->
@@ -348,7 +363,44 @@
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'group-broadcast') loadGroupMessages();
     });
+  });
+
+  /* ══════════════════════ GROUP BROADCAST ══════════════════════ */
+  async function loadGroupMessages() {
+    const scroll = document.getElementById('group-chat-scroll');
+    const empty  = document.getElementById('group-chat-empty');
+    const d = await api('/api/chat/group/admin/messages');
+    if (!d.ok) return;
+    if (!d.messages.length) { empty.style.display = 'flex'; return; }
+    empty.style.display = 'none';
+    scroll.querySelectorAll('.gc-bubble').forEach(el => el.remove());
+    d.messages.forEach(m => {
+      const div = document.createElement('div');
+      div.className = 'gc-bubble';
+      div.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px;';
+      div.innerHTML = `<div style="font-size:13px;color:#d8f0ff;white-space:pre-wrap;word-break:break-word">${esc(m.body)}</div><div style="font-size:10px;color:var(--text-muted);margin-top:4px">${m.created_at}</div>`;
+      scroll.appendChild(div);
+    });
+    scroll.scrollTop = scroll.scrollHeight;
+  }
+
+  async function sendGroupMessage() {
+    const input = document.getElementById('group-chat-input');
+    const body  = input.value.trim();
+    if (!body) return;
+    const d = await api('/api/chat/group/admin/send', { method: 'POST', body: JSON.stringify({ body }) });
+    if (d.ok) { input.value = ''; input.style.height = 'auto'; loadGroupMessages(); }
+    else toast('❌ ' + (d.error || 'Could not send'));
+  }
+
+  document.getElementById('group-chat-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendGroupMessage(); }
+  });
+  document.getElementById('group-chat-input').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
   });
 
   function closeOverlays() {
