@@ -6,6 +6,14 @@
   <title>Future AI Hub — My Team</title>
   <link rel="stylesheet" href="assets/shared.css">
   <style>
+    .more-btn {
+      display: block; margin: 4px 10px 16px;
+      padding: 11px; text-align: center;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; font-size: 13px; font-weight: 600;
+      color: var(--cyan); cursor: pointer;
+    }
+    .more-btn:active { opacity: 0.7; }
     .level-head {
       padding: 14px 12px 6px;
       font-size: 13px; font-weight: 700;
@@ -57,9 +65,11 @@
   <div class="scroll-area">
     <div class="level-head">Level 1 <span class="level-count" id="l1-count">0</span></div>
     <div id="level1-list"><div class="empty-state"><div class="empty-icon">👥</div>No direct invites yet</div></div>
+    <div id="level1-more"></div>
 
     <div class="level-head" style="margin-top:8px">Level 2 <span class="level-count" id="l2-count">0</span></div>
     <div id="level2-list"><div class="empty-state"><div class="empty-icon">👥</div>No level-2 invites yet</div></div>
+    <div id="level2-more"></div>
   </div>
 
   <nav class="bottom-nav" id="bottom-nav"></nav>
@@ -97,21 +107,49 @@
     `;
   }
 
+  const PAGE_SIZE = 10;
+  let level1All = [], level2All = [];
+  let level1Shown = PAGE_SIZE, level2Shown = PAGE_SIZE;
+
+  function renderLevel(listEl, moreEl, all, shown, emptyMsg, growFn) {
+    if (!all.length) {
+      listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div>${emptyMsg}</div>`;
+      moreEl.innerHTML = '';
+      return;
+    }
+    listEl.innerHTML = all.slice(0, shown).map(renderMember).join('');
+    const remaining = all.length - shown;
+    moreEl.innerHTML = remaining > 0
+      ? `<div class="more-btn" onclick="${growFn}()">Show More (${remaining} remaining)</div>`
+      : '';
+  }
+
+  window.growLevel1 = function () {
+    level1Shown += PAGE_SIZE;
+    renderLevel(document.getElementById('level1-list'), document.getElementById('level1-more'),
+                level1All, level1Shown, 'No direct invites yet', 'growLevel1');
+  };
+  window.growLevel2 = function () {
+    level2Shown += PAGE_SIZE;
+    renderLevel(document.getElementById('level2-list'), document.getElementById('level2-more'),
+                level2All, level2Shown, 'No level-2 invites yet', 'growLevel2');
+  };
+
   async function loadTeam() {
     try {
       const r = await fetch('/api/team');
       const d = await r.json();
       if (!d.ok) { window.location.href = 'index.html'; return; }
 
+      level1All = d.level1;
+      level2All = d.level2;
       document.getElementById('l1-count').textContent = d.level1.length;
       document.getElementById('l2-count').textContent = d.level2.length;
 
-      if (d.level1.length) {
-        document.getElementById('level1-list').innerHTML = d.level1.map(renderMember).join('');
-      }
-      if (d.level2.length) {
-        document.getElementById('level2-list').innerHTML = d.level2.map(renderMember).join('');
-      }
+      renderLevel(document.getElementById('level1-list'), document.getElementById('level1-more'),
+                  level1All, level1Shown, 'No direct invites yet', 'growLevel1');
+      renderLevel(document.getElementById('level2-list'), document.getElementById('level2-more'),
+                  level2All, level2Shown, 'No level-2 invites yet', 'growLevel2');
     } catch (e) {
       toast('❌ Could not load your team');
     }
