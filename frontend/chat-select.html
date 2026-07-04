@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Future AI Hub — Chat</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    .chat-option {
+      margin: 12px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border-cyan);
+      border-radius: 14px;
+      display: flex; align-items: center; gap: 14px;
+      padding: 18px 16px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s;
+      position: relative;
+    }
+    .chat-option:active { background: #071e30; }
+    .chat-option-icon {
+      width: 50px; height: 50px; border-radius: 50%;
+      background: #031628;
+      border: 2px solid var(--cyan);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+    .chat-option-body { flex: 1; min-width: 0; }
+    .chat-option-title { font-size: 16px; font-weight: 700; color: #d8f0ff; margin-bottom: 4px; }
+    .chat-option-sub   { font-size: 12px; color: var(--text-muted); }
+    .chat-option-badge {
+      position: absolute; top: 14px; right: 14px;
+      background: #e83a3a; color: #fff;
+      font-size: 11px; font-weight: 700;
+      min-width: 20px; height: 20px; border-radius: 10px;
+      display: none; align-items: center; justify-content: center;
+      padding: 0 5px;
+    }
+    .chat-option-badge.show { display: flex; }
+    .chevron { color: var(--text-muted); font-size: 20px; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="page">
+  <div class="app-bar">
+    <span class="app-bar-title">Chat</span>
+  </div>
+
+  <div class="scroll-area" style="padding-top:16px;">
+    <a class="chat-option" href="group-chat.html">
+      <div class="chat-option-icon">👥</div>
+      <div class="chat-option-body">
+        <div class="chat-option-title">Group Chat</div>
+        <div class="chat-option-sub">Broadcasts from your manager to the whole team</div>
+      </div>
+      <span class="chat-option-badge" id="badge-group"></span>
+      <span class="chevron">›</span>
+    </a>
+
+    <a class="chat-option" href="chat.html">
+      <div class="chat-option-icon">💬</div>
+      <div class="chat-option-body">
+        <div class="chat-option-title">Manager Chat</div>
+        <div class="chat-option-sub">Private conversation with your manager</div>
+      </div>
+      <span class="chat-option-badge" id="badge-private"></span>
+      <span class="chevron">›</span>
+    </a>
+  </div>
+
+  <nav class="bottom-nav" id="bottom-nav"></nav>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="assets/nav.js"></script>
+<script>
+  renderNav('chat');
+
+  // Show per-option badges from the same unread-count endpoint
+  (async function() {
+    try {
+      const r = await fetch('/api/chat/unread-count');
+      const d = await r.json();
+      if (!d.ok) return;
+      function showBadge(id, n) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (n > 0) { el.textContent = n > 99 ? '99+' : n; el.classList.add('show'); }
+      }
+      showBadge('badge-private', d.unread || 0);
+      showBadge('badge-group', d.group_unread || 0);
+    } catch(_) {}
+  })();
+</script>
+</body>
+</html>
