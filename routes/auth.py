@@ -53,38 +53,46 @@ def register():
             if ref:
                 invited_by = ref['id']
                 # Rule: an invitee always gets the SAME manager as whoever
-                # invited them — even if that means staying unassigned,
-                # because the inviter is unassigned too.
+                # invited them. (Should never be NULL in practice — every
+                # user is guaranteed a manager — but the fallback chain
+                # below still applies if it somehow were.)
                 assigned_manager_id = ref['assigned_manager_id']
 
-        if invited_by is None:
-            # No referrer — either a manager's own direct signup link
-            # (?mgr=CODE on index.html), or a fully organic signup.
+        if assigned_manager_id is None:
+            # No referrer, or the referrer's manager came back empty —
+            # either a manager's own direct signup link (?mgr=CODE on
+            # index.html), or a fully organic signup.
             manager_code = (data.get('manager_code') or '').strip().upper()
             if manager_code:
                 mgr = db.execute("SELECT id FROM admins WHERE manager_code=?", (manager_code,)).fetchone()
                 if mgr:
                     assigned_manager_id = mgr['id']
 
-            if assigned_manager_id is None:
-                # Round-robin fallback so organic signups still land with
-                # someone: whichever manager currently has the fewest
-                # assigned users. 'super' accounts are excluded from this
-                # pool — they're for oversight, not holding a batch.
-                least_loaded = db.execute("""
-                    SELECT a.id
-                    FROM admins a
-                    LEFT JOIN users u ON u.assigned_manager_id = a.id
-                    WHERE a.role = 'manager'
-                    GROUP BY a.id
-                    ORDER BY COUNT(u.id) ASC, a.id ASC
-                    LIMIT 1
-                """).fetchone()
-                if least_loaded:
-                    assigned_manager_id = least_loaded['id']
-                # If there are no 'manager' accounts at all yet (e.g. brand
-                # new deployment with only the seeded super), this stays
-                # NULL — a super can assign them once managers exist.
+        if assigned_manager_id is None:
+            # Round-robin fallback so organic signups still land with
+            # someone: whichever manager currently has the fewest
+            # assigned users. 'super' (the main manager) is excluded from
+            # this pool — they're for oversight, not holding a batch.
+            least_loaded = db.execute("""
+                SELECT a.id
+                FROM admins a
+                LEFT JOIN users u ON u.assigned_manager_id = a.id
+                WHERE a.role = 'manager'
+                GROUP BY a.id
+                ORDER BY COUNT(u.id) ASC, a.id ASC
+                LIMIT 1
+            """).fetchone()
+            if least_loaded:
+                assigned_manager_id = least_loaded['id']
+
+        if assigned_manager_id is None:
+            # No 'manager' accounts exist at all yet (e.g. brand new
+            # deployment with only the main manager) — every user must
+            # still be assigned to someone, so fall back to the main
+            # manager rather than leaving this NULL.
+            main_mgr = db.execute("SELECT id FROM admins WHERE role='super' ORDER BY created_at ASC LIMIT 1").fetchone()
+            if main_mgr:
+                assigned_manager_id = main_mgr['id']
 
         # The check above has a race: two identical registrations can both
         # pass it before either INSERT commits. The UNIQUE constraint on
@@ -160,5 +168,3 @@ def logout():
     resp = make_response(jsonify({'ok': True}))
     resp.delete_cookie('session_token')
     return resp
-
-                              
