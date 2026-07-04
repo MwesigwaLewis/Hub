@@ -383,6 +383,18 @@ def init_db():
         print(f"[DB] Seeded default admin '{default_user}' with role=super. "
               f"{'Using ADMIN_PASSWORD from env.' if os.environ.get('ADMIN_PASSWORD') else '⚠️  Using default password changeme123 — log in at /admin/login.html and change it immediately.'}")
 
+    # ── Guarantee: no user is ever left unassigned ──────────────────────────────
+    # Defense in depth on top of the registration-time fallback chain in
+    # routes/auth.py — covers users created before manager assignment
+    # existed, or anyone orphaned by a deleted manager slipping through.
+    cur.execute("SELECT id FROM admins WHERE role='super' ORDER BY created_at ASC LIMIT 1")
+    main_manager_row = cur.fetchone()
+    if main_manager_row:
+        cur.execute(
+            "UPDATE users SET assigned_manager_id=%s WHERE assigned_manager_id IS NULL",
+            (main_manager_row[0],)
+        )
+
     # ── Indexes ───────────────────────────────────────────────────────────────
     # These columns are hit on essentially every request (session check on
     # every page load, my-machines / team / transaction history lookups) but
@@ -407,6 +419,3 @@ def init_db():
     cur.close()
     conn.close()
     print("[DB] All tables ready (Supabase/Postgres).")
-
-
-    
