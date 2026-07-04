@@ -316,6 +316,27 @@ def init_db():
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_admin_activity_admin_id ON admin_activity_log(admin_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_admin_activity_created ON admin_activity_log(created_at DESC)")
+
+    # ── Group chat: one broadcast channel per manager ─────────────────────────
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS group_chat_messages (
+            id           SERIAL PRIMARY KEY,
+            manager_id   INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+            body         TEXT NOT NULL,
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_gcm_manager_id ON group_chat_messages(manager_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_gcm_created_at ON group_chat_messages(created_at DESC)")
+    # Tracks the last group message each user has read (for unread count)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS group_chat_read (
+            user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            manager_id INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+            last_read_id INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (user_id, manager_id)
+        )
+    """)
     # Backfill manager_code for any admin rows created before this existed.
     cur.execute("SELECT id FROM admins WHERE manager_code IS NULL")
     for (aid,) in cur.fetchall():
