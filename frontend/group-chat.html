@@ -98,13 +98,21 @@
   async function load() {
     try {
       const r = await fetch('/api/chat/group/messages');
+      if (r.status === 403) {
+        const empty = document.getElementById('chat-empty');
+        empty.innerHTML = '<div class="empty-icon">🔒</div>Group chat has been disabled by your manager.';
+        empty.style.display = 'flex';
+        return;
+      }
       const d = await r.json();
       if (!d.ok) { window.location.href = 'index.html'; return; }
-      if (d.manager) {
-        document.getElementById('mgr-name').textContent = d.manager.name || 'Group Chat';
-        if (d.manager.avatar_url) {
-          document.getElementById('mgr-avatar').src = d.manager.avatar_url;
-        }
+      // Icon: use group_icon if set, otherwise fall back to app icon
+      document.getElementById('mgr-avatar').src = d.group_icon || 'assets/icon-192.png';
+      // Name
+      if (d.group_name) {
+        document.getElementById('mgr-name').textContent = d.group_name;
+      } else if (d.manager) {
+        document.getElementById('mgr-name').textContent = d.manager.name + ' Group';
       }
       renderMessages(d.messages, d.manager ? d.manager.name : 'Manager');
     } catch(e) {}
@@ -115,5 +123,4 @@
   lucide.createIcons();
 </script>
 </body>
-  </html>
-                              
+</html>
