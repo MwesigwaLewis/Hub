@@ -201,19 +201,20 @@
 
       const { group, private: priv } = d;
 
-      // ── Group row ─────────────────────────────────────────────────────────
-      const groupName   = (group.manager && group.manager.name)
-        ? group.manager.name + ' — Group'
-        : 'Team Group Chat 🚀🚀🚀';
-      const groupAvatar = group.manager ? group.manager.avatar_url : null;
-      const groupRow    = buildRow(
-        'group-chat.html',
-        groupAvatar, '👥',
-        groupName,
-        group.last_at,
-        group.last_message,
-        group.unread
-      );
+      // ── Group row — hidden if manager disabled the group ──────────────────
+      let groupRow = '';
+      if (group.group_enabled) {
+        const groupName   = group.group_name || ((group.manager && group.manager.name) ? group.manager.name + ' Group' : 'Team Group Chat');
+        const groupAvatar = group.manager ? group.manager.avatar_url : null;
+        groupRow = buildRow(
+          'group-chat.html',
+          groupAvatar, '👥',
+          groupName,
+          group.last_at,
+          group.last_message,
+          group.unread
+        );
+      }
 
       // ── Private row ───────────────────────────────────────────────────────
       const privName   = (group.manager && group.manager.name) ? group.manager.name : 'Manager';
@@ -239,5 +240,4 @@
   load();
 </script>
 </body>
-  </html>
-        
+</html>
