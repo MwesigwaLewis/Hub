@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Future AI Hub — Manager Dashboard</title>
   <link rel="stylesheet" href="../assets/shared.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#060a10">
   <style>
     body { min-height: 100vh; }
     .admin-bar {
@@ -41,7 +43,7 @@
 
     /* Inbox */
     .conv-row {
-      display: flex; justify-content: space-between; align-items: center;
+      display: flex; align-items: center; gap: 10px;
       background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
       padding: 12px; margin-bottom: 8px; cursor: pointer;
     }
@@ -102,6 +104,33 @@
     .sub-heading { font-size: 12px; font-weight: 700; color: var(--cyan); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
     .empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
     .mini-note { font-size: 11px; color: #5a8aaa; margin-top: -4px; margin-bottom: 10px; }
+
+    .load-more-btn {
+      display: block; width: 100%; margin-top: 4px; padding: 11px;
+      border-radius: 10px; border: 1px solid var(--border); background: var(--surface);
+      color: var(--cyan); font-weight: 700; font-size: 13px; cursor: pointer;
+    }
+    .load-more-btn:active { opacity: 0.8; }
+
+    .toggle-switch {
+      position: relative; width: 40px; height: 22px; flex-shrink: 0;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; background: #23384a; border-radius: 22px;
+      cursor: pointer; transition: 0.15s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px;
+      background: #fff; border-radius: 50%; transition: 0.15s;
+    }
+    .toggle-switch input:checked + .toggle-slider { background: var(--cyan); }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+    .avatar-thumb {
+      width: 36px; height: 36px; border-radius: 50%; object-fit: cover;
+      border: 1px solid var(--border-cyan); flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -126,19 +155,23 @@
   <div class="tab-btn" data-tab="users">Users</div>
   <div class="tab-btn" data-tab="machines">Machines</div>
   <div class="tab-btn" data-tab="deposits">Deposits</div>
-  <div class="tab-btn" data-tab="managers">Managers</div>
+  <div class="tab-btn" data-tab="managers" id="tab-btn-managers" style="display:none">Managers</div>
   <div class="tab-btn" data-tab="announcements">Announcements</div>
   <div class="tab-btn" data-tab="rewards">Reward Codes</div>
+  <div class="tab-btn" data-tab="activity" id="tab-btn-activity" style="display:none">Activity Log</div>
+  <div class="tab-btn" data-tab="profile">My Profile</div>
 </div>
 
 <!-- INBOX -->
 <div class="tab-panel active" id="panel-inbox">
   <div id="conv-list"><div class="empty-state">No conversations yet</div></div>
+  <button class="load-more-btn" id="inbox-load-more" style="display:none" onclick="loadConversations(true)">Load More</button>
 </div>
 
 <!-- WITHDRAWALS -->
 <div class="tab-panel" id="panel-withdrawals">
   <div id="withdraw-list"><div class="empty-state">No pending withdrawals</div></div>
+  <button class="load-more-btn" id="withdrawals-load-more" style="display:none" onclick="loadWithdrawals(true)">Load More</button>
 </div>
 
 <!-- USERS -->
@@ -151,20 +184,19 @@
     </select>
   </div>
   <div id="user-list"><div class="empty-state">Loading…</div></div>
+  <button class="load-more-btn" id="users-load-more" style="display:none" onclick="loadUsers(undefined, undefined, true)">Load More</button>
 </div>
-
-<!-- MACHINES -->
 <div class="tab-panel" id="panel-machines">
   <div class="section-head">
     <h3>Machine Catalogue</h3>
     <button class="add-btn" onclick="openAddMachine()">+ Add Machine</button>
   </div>
   <div id="machine-list"><div class="empty-state">Loading…</div></div>
+  <button class="load-more-btn" id="machines-load-more" style="display:none" onclick="loadMachines(true)">Load More</button>
 </div>
-
-<!-- DEPOSITS -->
 <div class="tab-panel" id="panel-deposits">
   <div id="deposit-list"><div class="empty-state">Loading…</div></div>
+  <button class="load-more-btn" id="deposits-load-more" style="display:none" onclick="loadDeposits(true)">Load More</button>
 </div>
 
 <!-- MANAGERS -->
@@ -172,6 +204,13 @@
   <div class="section-head">
     <h3>Manager Accounts</h3>
     <button class="add-btn" onclick="openAddManager()">+ Add Manager</button>
+  </div>
+  <div class="row-card">
+    <div class="row-sub" style="margin-bottom:8px">"View All Members" lets a manager see every user across every batch, not just their own — off by default.</div>
+    <div class="row-actions">
+      <button class="act-btn act-approve" onclick="bulkSetVisibility(true)">Enable for All</button>
+      <button class="act-btn act-reject" onclick="bulkSetVisibility(false)">Disable for All</button>
+    </div>
   </div>
   <div id="manager-list"><div class="empty-state">Loading…</div></div>
 </div>
@@ -183,15 +222,36 @@
     <button class="add-btn" onclick="openAddAnnouncement()">+ New</button>
   </div>
   <div id="announcement-list"><div class="empty-state">Loading…</div></div>
+  <button class="load-more-btn" id="announcements-load-more" style="display:none" onclick="loadAnnouncements(true)">Load More</button>
 </div>
-
-<!-- REWARD CODES -->
 <div class="tab-panel" id="panel-rewards">
   <div class="section-head">
     <h3>Reward Codes</h3>
     <button class="add-btn" onclick="openAddRewardCode()">+ Create Code</button>
   </div>
   <div id="reward-code-list"><div class="empty-state">Loading…</div></div>
+  <button class="load-more-btn" id="rewards-load-more" style="display:none" onclick="loadRewardCodes(true)">Load More</button>
+</div>
+
+<!-- ACTIVITY LOG (main manager only) -->
+<div class="tab-panel" id="panel-activity">
+  <div class="section-head"><h3>Activity Log</h3></div>
+  <div class="mini-note">Every action other managers take, recorded silently — they never see this.</div>
+  <div id="activity-list"><div class="empty-state">Loading…</div></div>
+  <button class="load-more-btn" id="activity-load-more" style="display:none" onclick="loadActivityLog(true)">Load More</button>
+</div>
+
+<!-- MY PROFILE -->
+<div class="tab-panel" id="panel-profile">
+  <div class="section-head"><h3>My Profile</h3></div>
+  <div class="row-card" style="text-align:center; padding:20px 12px;">
+    <img id="profile-avatar-preview" src="../assets/icon-512.png" alt="Avatar"
+         style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--border-cyan);margin-bottom:12px;">
+    <div class="form-field" style="text-align:left"><label>Display Name</label><input id="profile-name"></div>
+    <div class="form-field" style="text-align:left"><label>Avatar URL</label><input id="profile-avatar-url" placeholder="https://…"></div>
+    <div class="mini-note" style="text-align:left">Shown to users in chat and on the Manager page. Leave blank to use the default app icon.</div>
+    <div class="form-actions"><button class="btn-primary" onclick="saveProfile()">Save Profile</button></div>
+  </div>
 </div>
 </div>
 
@@ -247,12 +307,26 @@
     return r.json();
   }
 
+  // Installable as a PWA (manifest.json above) — no in-app "Download App"
+  // button here on purpose; managers who want it just use their browser's
+  // own "Install app" / "Add to Home Screen" menu option.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
+
   // ── Auth guard ────────────────────────────────────────────────────────────
   let ME = null;
   api('/api/admin/me').then(d => {
     if (!d.ok) { window.location.href = 'login.html'; return; }
     ME = d;
+    if (ME.is_super) {
+      document.getElementById('tab-btn-managers').style.display = '';
+      document.getElementById('tab-btn-activity').style.display = '';
+    }
     initManagerFilter();
+    loadProfileForm();
     refreshAll();
   }).catch(() => { window.location.href = 'login.html'; });
 
@@ -263,7 +337,8 @@
 
   function refreshAll() {
     loadStats(); loadConversations(); loadWithdrawals();
-    loadUsers(); loadMachines(); loadDeposits(); loadManagers(); loadAnnouncements(); loadRewardCodes();
+    loadUsers(); loadMachines(); loadDeposits(); loadAnnouncements(); loadRewardCodes();
+    if (ME && ME.is_super) { loadManagers(); loadActivityLog(); }
   }
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
@@ -292,19 +367,27 @@
   }
 
   /* ══════════════════════ INBOX ══════════════════════ */
-  async function loadConversations() {
-    const d = await api('/api/admin/chat/conversations');
+  let inboxOffset = 0;
+  const INBOX_PAGE = 20;
+  async function loadConversations(more) {
+    if (!more) inboxOffset = 0;
+    const d = await api(`/api/admin/chat/conversations?limit=${INBOX_PAGE}&offset=${inboxOffset}`);
     const list = document.getElementById('conv-list');
-    if (!d.ok || !d.conversations.length) { list.innerHTML = '<div class="empty-state">No conversations yet</div>'; return; }
-    list.innerHTML = d.conversations.map(c => `
+    const btn = document.getElementById('inbox-load-more');
+    if (!d.ok) { list.innerHTML = '<div class="empty-state">Could not load conversations</div>'; btn.style.display = 'none'; return; }
+    const html = d.conversations.map(c => `
       <div class="conv-row ${c.unread ? 'unread' : ''}" onclick="openThread(${c.user_id}, '${esc(c.nick || c.phone)}')">
-        <div>
+        <img class="avatar-thumb" src="${avatarSrc(c.user_avatar)}" onerror="this.src='../assets/icon-512.png'">
+        <div style="flex:1">
           <div class="conv-phone">${esc(c.phone)}</div>
           <div class="conv-preview">${c.last_sender === 'admin' ? 'You: ' : ''}${esc((c.last_message || '').slice(0, 60))}</div>
         </div>
         ${c.unread ? '<div class="conv-dot"></div>' : ''}
       </div>
     `).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No conversations yet</div>'; }
+    inboxOffset += d.conversations.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
   }
 
   let currentThreadUserId = null;
@@ -341,11 +424,15 @@
   document.getElementById('thread-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendThreadReply(); });
 
   /* ══════════════════════ WITHDRAWALS ══════════════════════ */
-  async function loadWithdrawals() {
-    const d = await api('/api/admin/withdrawals?status=pending');
+  let withdrawalsOffset = 0;
+  const WITHDRAWALS_PAGE = 20;
+  async function loadWithdrawals(more) {
+    if (!more) withdrawalsOffset = 0;
+    const d = await api(`/api/admin/withdrawals?status=pending&limit=${WITHDRAWALS_PAGE}&offset=${withdrawalsOffset}`);
     const list = document.getElementById('withdraw-list');
-    if (!d.ok || !d.withdrawals.length) { list.innerHTML = '<div class="empty-state">No pending withdrawals</div>'; return; }
-    list.innerHTML = d.withdrawals.map(w => `
+    const btn = document.getElementById('withdrawals-load-more');
+    if (!d.ok) { list.innerHTML = '<div class="empty-state">Could not load withdrawals</div>'; btn.style.display = 'none'; return; }
+    const html = d.withdrawals.map(w => `
       <div class="row-card">
         <div class="row-top"><span class="row-amount">${fmt(w.amount)}</span><span class="row-sub">${w.created_at}</span></div>
         <div class="row-sub">${esc(w.phone)} ${w.nick ? '· ' + esc(w.nick) : ''}</div>
@@ -355,6 +442,9 @@
         </div>
       </div>
     `).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No pending withdrawals</div>'; }
+    withdrawalsOffset += d.withdrawals.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
   }
   window.processWithdrawal = async function (id, action) {
     const d = await api(`/api/admin/withdrawals/${id}/${action}`, { method: 'POST' });
@@ -366,28 +456,52 @@
   /* ══════════════════════ USERS ══════════════════════ */
   let managersById = {};
 
-  async function loadUsers(search, managerId) {
+  let usersOffset = 0;
+  let usersLastSearch = '';
+  let usersLastManager = '';
+  const USERS_PAGE = 30;
+
+  async function loadUsers(search, managerId, more) {
     const filterEl = document.getElementById('manager-filter');
     const effectiveManager = managerId !== undefined ? managerId : (filterEl ? filterEl.value : '');
     if (managerId !== undefined && filterEl) filterEl.value = managerId;
 
+    if (!more) {
+      usersOffset = 0;
+      usersLastSearch = search || '';
+      usersLastManager = effectiveManager || '';
+    }
+
     const params = new URLSearchParams();
-    if (search) params.set('search', search);
-    if (effectiveManager) params.set('manager', effectiveManager);
+    if (usersLastSearch) params.set('search', usersLastSearch);
+    if (usersLastManager) params.set('manager', usersLastManager);
+    params.set('limit', USERS_PAGE);
+    params.set('offset', usersOffset);
+
     const d = await api('/api/admin/users?' + params.toString());
     const list = document.getElementById('user-list');
-    if (!d.ok || !d.users.length) { list.innerHTML = '<div class="empty-state">No users found</div>'; return; }
-    list.innerHTML = d.users.map(u => {
+    const btn = document.getElementById('users-load-more');
+    if (!d.ok) { list.innerHTML = '<div class="empty-state">Could not load users</div>'; btn.style.display = 'none'; return; }
+    const html = d.users.map(u => {
       const mgrName = u.assigned_manager_id ? (managersById[u.assigned_manager_id] || `#${u.assigned_manager_id}`) : 'Unassigned';
       return `
       <div class="row-card" onclick="openUserDetail(${u.id})" style="cursor:pointer">
-        <div class="row-top"><span class="row-amount">${fmt(u.balance)}</span><span class="row-sub">Joined ${u.created_at}</span></div>
+        <div class="row-top">
+          <div style="display:flex;align-items:center;gap:8px">
+            <img class="avatar-thumb" src="${avatarSrc(u.avatar_url)}" onerror="this.src='../assets/icon-512.png'">
+            <span class="row-amount">${fmt(u.balance)}</span>
+          </div>
+          <span class="row-sub">Joined ${u.created_at}</span>
+        </div>
         <div class="row-sub">${esc(u.phone)} ${u.nick ? '· ' + esc(u.nick) : ''} · VIP ${u.vip_level}</div>
         <div class="row-sub">Deposited ${fmt(u.total_deposit)} · Withdrawn ${fmt(u.total_withdraw)} · AI income ${fmt(u.ai_income)} · ${u.invite_count} invites</div>
         ${ME && ME.is_super ? `<div class="row-sub">Manager: <b style="color:var(--cyan)">${esc(mgrName)}</b></div>` : ''}
       </div>
     `;
     }).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No users found</div>'; }
+    usersOffset += d.users.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
   }
   let searchTimer = null;
   document.getElementById('user-search').addEventListener('input', (e) => {
@@ -412,7 +526,7 @@
   }
 
   const USER_FIELD_LABELS = {
-    phone: 'Phone', nick: 'Nickname', email: 'Email', vip_level: 'VIP Level',
+    phone: 'Phone', nick: 'Nickname', avatar_url: 'Avatar URL', email: 'Email', vip_level: 'VIP Level',
     depositing_invites: 'Depositing Invites (drives VIP level)',
     balance: 'Balance', wallet: 'Wallet', total_deposit: 'Total Deposit',
     total_withdraw: 'Total Withdraw', ai_income: 'AI Income', today_earnings: "Today's Earnings",
@@ -480,6 +594,10 @@
     ` : '';
 
     document.getElementById('user-overlay-body').innerHTML = `
+      <div style="text-align:center;margin-bottom:12px">
+        <img src="${avatarSrc(u.avatar_url)}" onerror="this.src='../assets/icon-512.png'"
+             style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--border-cyan)">
+      </div>
       <div class="sub-heading">Edit Fields</div>
       ${fieldsHtml}
       <div class="form-actions">
@@ -565,11 +683,15 @@
   };
 
   /* ══════════════════════ MACHINES ══════════════════════ */
-  async function loadMachines() {
-    const d = await api('/api/admin/machines');
+  let machinesOffset = 0;
+  const MACHINES_PAGE = 20;
+  async function loadMachines(more) {
+    if (!more) machinesOffset = 0;
+    const d = await api(`/api/admin/machines?limit=${MACHINES_PAGE}&offset=${machinesOffset}`);
     const list = document.getElementById('machine-list');
-    if (!d.ok || !d.machines.length) { list.innerHTML = '<div class="empty-state">No machines yet</div>'; return; }
-    list.innerHTML = d.machines.map(m => `
+    const btn = document.getElementById('machines-load-more');
+    if (!d.ok) { list.innerHTML = '<div class="empty-state">Could not load machines</div>'; btn.style.display = 'none'; return; }
+    const html = d.machines.map(m => `
       <div class="row-card">
         <div class="row-top">
           <span style="color:var(--cyan);font-weight:700">${esc(m.id)}</span>
@@ -595,6 +717,9 @@
         </div>
       </div>
     `).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No machines yet</div>'; }
+    machinesOffset += d.machines.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
   }
   window.saveMachine = async function (id) {
     const updates = {};
@@ -640,11 +765,15 @@
   };
 
   /* ══════════════════════ DEPOSITS ══════════════════════ */
-  async function loadDeposits() {
-    const d = await api('/api/admin/deposits');
+  let depositsOffset = 0;
+  const DEPOSITS_PAGE = 20;
+  async function loadDeposits(more) {
+    if (!more) depositsOffset = 0;
+    const d = await api(`/api/admin/deposits?limit=${DEPOSITS_PAGE}&offset=${depositsOffset}`);
     const list = document.getElementById('deposit-list');
-    if (!d.ok || !d.deposits.length) { list.innerHTML = '<div class="empty-state">No deposits yet</div>'; return; }
-    list.innerHTML = d.deposits.map(dep => `
+    const btn = document.getElementById('deposits-load-more');
+    if (!d.ok) { list.innerHTML = '<div class="empty-state">Could not load deposits</div>'; btn.style.display = 'none'; return; }
+    const html = d.deposits.map(dep => `
       <div class="row-card">
         <div class="row-top">
           <span class="row-amount">${fmt(dep.amount)}</span>
@@ -662,6 +791,9 @@
         </div>
       </div>
     `).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No deposits yet</div>'; }
+    depositsOffset += d.deposits.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
   }
   window.saveDepositStatus = async function (id) {
     const status = document.querySelector(`[data-dep-id="${id}"]`).value;
@@ -671,21 +803,41 @@
   };
 
   /* ══════════════════════ MANAGERS ══════════════════════ */
+  function avatarSrc(url) {
+    return url && url.trim() ? url : '../assets/icon-512.png';
+  }
+
   async function loadManagers() {
     const d = await api('/api/admin/admins');
     const list = document.getElementById('manager-list');
-    if (!d.ok || !d.admins.length) { list.innerHTML = '<div class="empty-state">No managers found</div>'; return; }
+    if (!d.ok) {
+      list.innerHTML = `<div class="empty-state">${esc(d.error || 'Could not load managers')}</div>`;
+      return;
+    }
+    if (!d.admins.length) { list.innerHTML = '<div class="empty-state">No managers found</div>'; return; }
     list.innerHTML = d.admins.map(a => `
       <div class="row-card">
         <div class="row-top">
-          <span style="font-weight:700;color:#fff">${esc(a.name)} ${a.is_you ? '<span style="color:var(--cyan);font-size:11px">(you)</span>' : ''}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <img class="avatar-thumb" src="${avatarSrc(a.avatar_url)}" onerror="this.src='../assets/icon-512.png'">
+            <span style="font-weight:700;color:#fff">${esc(a.name)} ${a.is_you ? '<span style="color:var(--cyan);font-size:11px">(you)</span>' : ''}</span>
+          </div>
           <span class="status-pill ${a.role === 'super' ? 'pill-successful' : 'pill-pending'}">${a.role}</span>
         </div>
         <div class="row-sub">@${esc(a.username)} · ${a.batch_size} user${a.batch_size == 1 ? '' : 's'} in batch · added ${a.created_at}</div>
         <div class="row-sub">Signup link: <code style="color:var(--cyan)">?mgr=${esc(a.manager_code)}</code></div>
+        ${a.role === 'manager' ? `
+          <div class="row-top" style="margin-top:8px">
+            <span class="row-sub" style="margin-top:0">View all members (not just own batch)</span>
+            <label class="toggle-switch">
+              <input type="checkbox" ${a.can_see_all ? 'checked' : ''} onchange="setManagerVisibility(${a.id}, this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        ` : ''}
         <div class="row-actions">
           <button class="act-btn act-neutral" onclick="copyManagerLink('${esc(a.manager_code)}')">Copy Signup Link</button>
-          ${ME && ME.is_super ? `<button class="act-btn act-neutral" onclick="filterUsersByManager(${a.id})">View Batch</button>` : ''}
+          <button class="act-btn act-neutral" onclick="filterUsersByManager(${a.id})">View Batch</button>
           ${!a.is_you ? `<button class="act-btn act-reject" onclick="removeManager(${a.id})">Remove</button>` : ''}
         </div>
       </div>
@@ -703,10 +855,21 @@
     loadUsers('', managerId);
   };
   window.removeManager = async function (id) {
-    if (!confirm('Remove this manager account? Their batch will become unassigned until reassigned.')) return;
+    if (!confirm('Remove this manager account? Their entire batch is automatically reassigned to another manager (or to you) — nobody is left unassigned.')) return;
     const d = await api(`/api/admin/admins/${id}`, { method: 'DELETE' });
     if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
     toast('✅ Manager removed'); loadManagers();
+  };
+  window.setManagerVisibility = async function (id, canSeeAll) {
+    const d = await api(`/api/admin/admins/${id}/visibility`, { method: 'PATCH', body: JSON.stringify({ can_see_all: canSeeAll }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); loadManagers(); return; }
+    toast(canSeeAll ? '✅ Can now view all members' : '✅ Restricted to own batch');
+  };
+  window.bulkSetVisibility = async function (canSeeAll) {
+    if (!confirm(`${canSeeAll ? 'Enable' : 'Disable'} "View All Members" for every manager?`)) return;
+    const d = await api('/api/admin/admins/visibility/all', { method: 'PATCH', body: JSON.stringify({ can_see_all: canSeeAll }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Updated for all managers'); loadManagers();
   };
 
   window.openAddManager = function () {
@@ -715,36 +878,73 @@
       <div class="form-field"><label>Display Name</label><input id="am-name" placeholder="e.g. Sarah"></div>
       <div class="form-field"><label>Username</label><input id="am-username"></div>
       <div class="form-field"><label>Password</label><input id="am-password" type="text" placeholder="At least 8 characters"></div>
-      ${ME && ME.is_super ? `
-        <div class="form-field" style="display:flex;align-items:center;gap:8px">
-          <input type="checkbox" id="am-super" style="width:auto">
-          <label style="margin:0">Make Super Manager (sees every batch)</label>
-        </div>
-      ` : ''}
       <div class="mini-note">A personal signup link is generated automatically — anyone who registers through it lands in this manager's batch. Anyone THEY invite inherits the same manager.</div>
       <div class="form-actions"><button class="btn-primary" onclick="submitAddManager()">Create Manager</button></div>
     `;
     document.getElementById('form-overlay').classList.add('open');
   };
   window.submitAddManager = async function () {
-    const superEl = document.getElementById('am-super');
     const body = {
       name: document.getElementById('am-name').value.trim(),
       username: document.getElementById('am-username').value.trim(),
       password: document.getElementById('am-password').value,
-      role: (superEl && superEl.checked) ? 'super' : 'manager',
     };
     const d = await api('/api/admin/admins', { method: 'POST', body: JSON.stringify(body) });
     if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
     toast('✅ Manager created'); closeOverlays(); loadManagers();
   };
 
+  /* ══════════════════════ ACTIVITY LOG ══════════════════════ */
+  let activityOffset = 0;
+  const ACTIVITY_PAGE = 50;
+  async function loadActivityLog(more) {
+    if (!more) activityOffset = 0;
+    const d = await api(`/api/admin/activity-log?limit=${ACTIVITY_PAGE}&offset=${activityOffset}`);
+    const list = document.getElementById('activity-list');
+    const btn = document.getElementById('activity-load-more');
+    if (!d.ok) { list.innerHTML = `<div class="empty-state">${esc(d.error || 'Could not load')}</div>`; btn.style.display = 'none'; return; }
+    const html = d.logs.map(l => `
+      <div class="row-card">
+        <div class="row-top"><span style="font-weight:700;color:#fff">${esc(l.name || l.username)}</span><span class="row-sub">${l.created_at}</span></div>
+        <div class="row-sub">${esc(l.action)}${l.detail ? ' — ' + esc(l.detail) : ''}</div>
+      </div>
+    `).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No activity yet</div>'; }
+    activityOffset += d.logs.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
+  }
+
+  /* ══════════════════════ MY PROFILE ══════════════════════ */
+  function loadProfileForm() {
+    if (!ME) return;
+    document.getElementById('profile-name').value = ME.name || '';
+    document.getElementById('profile-avatar-url').value = ME.avatar_url || '';
+    document.getElementById('profile-avatar-preview').src = avatarSrc(ME.avatar_url);
+  }
+  document.getElementById('profile-avatar-url').addEventListener('input', (e) => {
+    document.getElementById('profile-avatar-preview').src = avatarSrc(e.target.value.trim());
+  });
+  window.saveProfile = async function () {
+    const body = {
+      name: document.getElementById('profile-name').value.trim(),
+      avatar_url: document.getElementById('profile-avatar-url').value.trim(),
+    };
+    const d = await api('/api/admin/update-profile', { method: 'PATCH', body: JSON.stringify(body) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Profile saved');
+    ME.name = body.name; ME.avatar_url = body.avatar_url;
+  };
+
   /* ══════════════════════ ANNOUNCEMENTS ══════════════════════ */
-  async function loadAnnouncements() {
-    const d = await api('/api/admin/announcements');
+  let announcementsOffset = 0;
+  const ANNOUNCEMENTS_PAGE = 20;
+  async function loadAnnouncements(more) {
+    if (!more) announcementsOffset = 0;
+    const d = await api(`/api/admin/announcements?limit=${ANNOUNCEMENTS_PAGE}&offset=${announcementsOffset}`);
     const list = document.getElementById('announcement-list');
-    if (!d.ok || !d.announcements.length) { list.innerHTML = '<div class="empty-state">No announcements yet</div>'; return; }
-    list.innerHTML = d.announcements.map(a => `
+    const btn = document.getElementById('announcements-load-more');
+    if (!d.ok) { list.innerHTML = '<div class="empty-state">Could not load announcements</div>'; btn.style.display = 'none'; return; }
+    const html = d.announcements.map(a => `
       <div class="row-card">
         <div class="form-field"><textarea data-ann-id="${a.id}" rows="2">${esc(a.text)}</textarea></div>
         <div class="row-sub">Posted ${a.created_at}</div>
@@ -754,6 +954,9 @@
         </div>
       </div>
     `).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No announcements yet</div>'; }
+    announcementsOffset += d.announcements.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
   }
   window.saveAnnouncement = async function (id) {
     const text = document.querySelector(`[data-ann-id="${id}"]`).value.trim();
@@ -791,11 +994,15 @@
     return { label: 'active', cls: 'pill-successful' };
   }
 
-  async function loadRewardCodes() {
-    const d = await api('/api/admin/reward-codes');
+  let rewardsOffset = 0;
+  const REWARDS_PAGE = 20;
+  async function loadRewardCodes(more) {
+    if (!more) rewardsOffset = 0;
+    const d = await api(`/api/admin/reward-codes?limit=${REWARDS_PAGE}&offset=${rewardsOffset}`);
     const list = document.getElementById('reward-code-list');
-    if (!d.ok || !d.reward_codes.length) { list.innerHTML = '<div class="empty-state">No reward codes yet</div>'; return; }
-    list.innerHTML = d.reward_codes.map(rc => {
+    const btn = document.getElementById('rewards-load-more');
+    if (!d.ok) { list.innerHTML = '<div class="empty-state">Could not load reward codes</div>'; btn.style.display = 'none'; return; }
+    const html = d.reward_codes.map(rc => {
       const st = rewardCodeStatus(rc);
       return `
         <div class="row-card">
@@ -813,6 +1020,9 @@
         </div>
       `;
     }).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No reward codes yet</div>'; }
+    rewardsOffset += d.reward_codes.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
   }
 
   window.toggleRewardCode = async function (id, newActive) {
