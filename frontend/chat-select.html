@@ -158,15 +158,13 @@
     return d.innerHTML;
   }
 
-  function avatarEl(url, fallbackEmoji) {
-    if (url && url.trim()) {
-      return `<img class="conv-avatar" src="${esc(url)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-              <div class="conv-avatar-fallback" style="display:none">${fallbackEmoji}</div>`;
-    }
-    return `<div class="conv-avatar-fallback">${fallbackEmoji}</div>`;
+  function avatarEl(url, fallback) {
+    // url is always a string (either custom or 'assets/icon-192.png')
+    return `<img class="conv-avatar" src="${esc(url)}" alt=""
+              onerror="this.src='assets/icon-192.png'">`;
   }
 
-  function buildRow(href, avatarUrl, fallbackEmoji, name, date, previewText, unread) {
+  function buildRow(href, avatarUrl, name, date, previewText, unread) {
     const unreadHtml = unread > 0
       ? `<span class="conv-unread show">${unread > 99 ? '99+' : unread}</span>`
       : '';
@@ -179,7 +177,7 @@
 
     return `
       <a class="conv-row" href="${href}">
-        ${avatarEl(avatarUrl, fallbackEmoji)}
+        ${avatarEl(avatarUrl)}
         <div class="conv-body">
           <div class="conv-top">
             <span class="conv-name">${esc(name)}</span>
@@ -205,10 +203,10 @@
       let groupRow = '';
       if (group.group_enabled) {
         const groupName   = group.group_name || ((group.manager && group.manager.name) ? group.manager.name + ' Group' : 'Team Group Chat');
-        const groupAvatar = group.manager ? group.manager.avatar_url : null;
+        const groupIcon   = group.group_icon  || 'assets/icon-192.png';
         groupRow = buildRow(
           'group-chat.html',
-          groupAvatar, '👥',
+          groupIcon,
           groupName,
           group.last_at,
           group.last_message,
@@ -218,10 +216,10 @@
 
       // ── Private row ───────────────────────────────────────────────────────
       const privName   = (group.manager && group.manager.name) ? group.manager.name : 'Manager';
-      const privAvatar = group.manager ? group.manager.avatar_url : null;
+      const privAvatar = (group.manager && group.manager.avatar_url) ? group.manager.avatar_url : 'assets/icon-192.png';
       const privRow    = buildRow(
         'chat.html',
-        privAvatar, '💬',
+        privAvatar,
         privName,
         priv.last_at,
         priv.last_message
