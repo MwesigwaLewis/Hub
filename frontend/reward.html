@@ -6,6 +6,14 @@
   <title>Future AI Hub — Redeem Reward</title>
   <link rel="stylesheet" href="assets/shared.css">
   <style>
+    .more-btn {
+      display: block; margin: 4px 12px 16px;
+      padding: 11px; text-align: center;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; font-size: 13px; font-weight: 600;
+      color: var(--cyan); cursor: pointer;
+    }
+    .more-btn:active { opacity: 0.7; }
     .redeem-card {
       margin: 20px 12px; background: var(--surface); border: 1px solid var(--border);
       border-radius: 16px; padding: 24px 20px; text-align: center;
@@ -57,6 +65,7 @@
 
     <div class="history-head">Redemption History</div>
     <div id="history-list"><div class="empty-state"><div class="empty-icon">🎁</div>No rewards redeemed yet</div></div>
+    <div id="history-more"></div>
   </div>
 
   <nav class="bottom-nav" id="bottom-nav"></nav>
@@ -69,22 +78,40 @@
   renderNav('my');
   const fmt = n => parseFloat(n || 0).toLocaleString();
 
+  const HISTORY_PAGE = 10;
+  let historyAll = [];
+  let historyShown = HISTORY_PAGE;
+
+  function renderHistory() {
+    const list = document.getElementById('history-list');
+    const moreEl = document.getElementById('history-more');
+    if (!historyAll.length) { moreEl.innerHTML = ''; return; }
+    list.innerHTML = historyAll.slice(0, historyShown).map(h => `
+      <div class="history-row">
+        <div>
+          <div class="history-code">${h.code}</div>
+          <div class="history-desc">${h.description || ''} · ${h.redeemed_at}</div>
+        </div>
+        <div class="history-amount">+${fmt(h.amount)}</div>
+      </div>
+    `).join('');
+    const remaining = historyAll.length - historyShown;
+    moreEl.innerHTML = remaining > 0
+      ? `<div class="more-btn" onclick="growHistory()">Show More (${remaining} remaining)</div>`
+      : '';
+  }
+  window.growHistory = function () {
+    historyShown += HISTORY_PAGE;
+    renderHistory();
+  };
+
   async function loadHistory() {
     try {
       const r = await fetch('/api/rewards/history');
       const d = await r.json();
       if (!d.ok) return;
-      const list = document.getElementById('history-list');
-      if (!d.history.length) return;
-      list.innerHTML = d.history.map(h => `
-        <div class="history-row">
-          <div>
-            <div class="history-code">${h.code}</div>
-            <div class="history-desc">${h.description || ''} · ${h.redeemed_at}</div>
-          </div>
-          <div class="history-amount">+${fmt(h.amount)}</div>
-        </div>
-      `).join('');
+      historyAll = d.history;
+      renderHistory();
     } catch (e) {}
   }
 
@@ -117,4 +144,4 @@
   loadHistory();
 </script>
 </body>
-  </html>
+</html>
