@@ -700,22 +700,32 @@
     document.getElementById('detail-page').classList.add('open');
     window.scrollTo(0, 0);
 
-    // Render nav on detail page too
+    // Render nav on detail page too — must build proper HTML like renderNav does
     const detailNav = document.getElementById('detail-bottom-nav');
-    if (detailNav && typeof renderNav === 'function') {
-      const pages = [
-        { id: 'home', label: 'Home', href: 'home.html' },
+    if (detailNav) {
+      const detailPages = [
+        { id: 'home',   label: 'Home',   href: 'home.html' },
         { id: 'raffle', label: 'Raffle', href: 'raffle.html' },
-        { id: 'ai', label: 'AI', href: 'ai.html' },
+        { id: 'chat',   label: 'Chat',   href: 'chat-select.html' },
+        { id: 'ai',     label: 'AI',     href: 'ai.html' },
         { id: 'income', label: 'Income', href: 'income.html' },
-        { id: 'my', label: 'My', href: 'my.html' },
+        { id: 'my',     label: 'My',     href: 'my.html' },
       ];
-      detailNav.innerHTML = pages.map(p => `
-        <a href="${p.href}" class="nav-item${p.id === 'ai' ? ' active' : ''}">
-          <div class="nav-icon">${NAV_ICONS[p.id]}</div>
-          <span>${p.label}</span>
-        </a>
-      `).join('');
+      detailNav.innerHTML = detailPages.map(p => {
+        const iconName = NAV_ICONS[p.id];
+        const isFa = iconName && iconName.startsWith('fa-');
+        const iconHtml = isFa
+          ? `<i class="${iconName}"></i>`
+          : `<i data-lucide="${iconName}"></i>`;
+        const iconWrap = p.id === 'chat'
+          ? `<div class="nav-icon" style="position:relative">${iconHtml}<span class="chat-badge" id="detail-chat-badge" style="display:none;position:absolute;top:-4px;right:-6px;background:#e83a3a;color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px;line-height:16px;"></span></div>`
+          : `<div class="nav-icon">${iconHtml}</div>`;
+        return `<a href="${p.href}" class="nav-item${p.id === 'ai' ? ' active' : ''}">${iconWrap}<span>${p.label}</span></a>`;
+      }).join('');
+      // Re-run Lucide so data-lucide icons in the detail nav get rendered
+      ensureLucide(() => window.lucide && window.lucide.createIcons());
+      const needsFa = detailPages.some(p => NAV_ICONS[p.id] && NAV_ICONS[p.id].startsWith('fa-'));
+      if (needsFa) ensureFontAwesome();
     }
   }
 
