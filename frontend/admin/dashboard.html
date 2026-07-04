@@ -171,13 +171,49 @@
 
 <!-- GROUP BROADCAST -->
 <div class="tab-panel" id="panel-group-broadcast">
-  <div style="padding:10px 14px 6px;font-size:12px;color:var(--text-muted);">
-    Messages here are sent to <strong>all your members</strong> as a read-only broadcast. Use it for announcements, updates, or alerts to your whole team.
+  <!-- Settings bar -->
+  <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:10px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <span style="font-size:13px;font-weight:600;color:#c8e4f4;">Group Chat</span>
+      <!-- Enabled toggle -->
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+        <span id="group-enabled-label" style="font-size:12px;color:var(--text-muted);">Enabled</span>
+        <div id="group-toggle-track" onclick="toggleGroupEnabled()"
+             style="width:44px;height:24px;border-radius:12px;background:#1a3050;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
+          <div id="group-toggle-thumb"
+               style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;"></div>
+        </div>
+      </label>
+    </div>
+    <!-- Group name field -->
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input id="group-name-input" class="field" style="flex:1;height:36px;padding:0 12px;font-size:13px;"
+             placeholder="Group name (default: Manager Name Group)" maxlength="60">
+      <button class="btn" onclick="saveGroupName()" style="padding:7px 14px;font-size:13px;white-space:nowrap;">Save Name</button>
+    </div>
+    <!-- Super-only: manager selector -->
+    <div id="group-manager-selector" style="display:none;">
+      <select id="group-manager-select" class="field" style="width:100%;height:36px;padding:0 10px;font-size:13px;"
+              onchange="loadGroupMessages()">
+        <option value="">— My own group —</option>
+      </select>
+    </div>
   </div>
-  <div id="group-chat-scroll" style="display:flex;flex-direction:column;gap:8px;padding:8px 10px;max-height:50vh;overflow-y:auto;">
+
+  <!-- Disabled notice -->
+  <div id="group-disabled-notice" style="display:none;padding:14px;text-align:center;font-size:13px;color:#e87a3a;border-bottom:1px solid var(--border);">
+    ⚠️ Group chat is currently <strong>disabled</strong>. Members cannot see or access this channel.
+  </div>
+
+  <div style="font-size:12px;color:var(--text-muted);padding:8px 14px 2px;">
+    Messages sent here go to <strong>all your members</strong> as a read-only broadcast.
+  </div>
+
+  <div id="group-chat-scroll" style="display:flex;flex-direction:column;gap:8px;padding:8px 10px;max-height:45vh;overflow-y:auto;">
     <div class="empty-state" id="group-chat-empty">No group messages yet</div>
   </div>
-  <div style="display:flex;gap:8px;padding:10px;border-top:1px solid var(--border);">
+
+  <div id="group-send-bar" style="display:flex;gap:8px;padding:10px;border-top:1px solid var(--border);">
     <textarea id="group-chat-input" class="field" style="flex:1;resize:none;min-height:40px;max-height:100px;border-radius:10px;padding:10px 14px;" placeholder="Broadcast a message to your team…" rows="1"></textarea>
     <button class="btn" onclick="sendGroupMessage()" style="align-self:flex-end;padding:10px 16px;">Send</button>
   </div>
@@ -368,11 +404,32 @@
   });
 
   /* ══════════════════════ GROUP BROADCAST ══════════════════════ */
+  let _groupEnabled = true;
+
+  function _groupTargetParam() {
+    // Super can act on a specific manager's group via the dropdown
+    if (ME && ME.is_super) {
+      const sel = document.getElementById('group-manager-select');
+      const val = sel ? sel.value : '';
+      return val ? `?manager_id=${val}` : '';
+    }
+    return '';
+  }
+
   async function loadGroupMessages() {
     const scroll = document.getElementById('group-chat-scroll');
     const empty  = document.getElementById('group-chat-empty');
-    const d = await api('/api/chat/group/admin/messages');
+    const param  = _groupTargetParam();
+    const d = await api(`/api/chat/group/admin/messages${param}`);
     if (!d.ok) return;
+
+    // Sync settings UI
+    _groupEnabled = d.group_enabled;
+    _applyGroupEnabledUI(d.group_enabled);
+    if (d.group_name !== undefined) {
+      document.getElementById('group-name-input').value = d.group_name || '';
+    }
+
     if (!d.messages.length) { empty.style.display = 'flex'; return; }
     empty.style.display = 'none';
     scroll.querySelectorAll('.gc-bubble').forEach(el => el.remove());
@@ -386,11 +443,62 @@
     scroll.scrollTop = scroll.scrollHeight;
   }
 
+  function _applyGroupEnabledUI(enabled) {
+    const track  = document.getElementById('group-toggle-track');
+    const thumb  = document.getElementById('group-toggle-thumb');
+    const label  = document.getElementById('group-enabled-label');
+    const notice = document.getElementById('group-disabled-notice');
+    const sendBar = document.getElementById('group-send-bar');
+    if (!track) return;
+    if (enabled) {
+      track.style.background = 'var(--cyan)';
+      thumb.style.left = '22px';
+      label.textContent = 'Enabled';
+      label.style.color = 'var(--cyan)';
+      notice.style.display = 'none';
+      // Super can still send to disabled group; others see no send bar when disabled
+      sendBar.style.display = 'flex';
+    } else {
+      track.style.background = '#1a3050';
+      thumb.style.left = '2px';
+      label.textContent = 'Disabled';
+      label.style.color = '#e87a3a';
+      notice.style.display = 'block';
+      // Super always sees send bar; others don't when disabled
+      sendBar.style.display = (ME && ME.is_super) ? 'flex' : 'none';
+    }
+  }
+
+  async function toggleGroupEnabled() {
+    const newVal = !_groupEnabled;
+    const param  = _groupTargetParam();
+    const d = await api(`/api/chat/group/admin/settings${param}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ group_enabled: newVal }),
+    });
+    if (d.ok) { _groupEnabled = newVal; _applyGroupEnabledUI(newVal); }
+    else toast('❌ ' + (d.error || 'Could not update setting'));
+  }
+
+  async function saveGroupName() {
+    const name  = document.getElementById('group-name-input').value.trim();
+    const param = _groupTargetParam();
+    const d = await api(`/api/chat/group/admin/settings${param}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ group_name: name }),
+    });
+    if (d.ok) toast('✅ Group name saved');
+    else toast('❌ ' + (d.error || 'Could not save name'));
+  }
+
   async function sendGroupMessage() {
-    const input = document.getElementById('group-chat-input');
-    const body  = input.value.trim();
+    const input  = document.getElementById('group-chat-input');
+    const body   = input.value.trim();
     if (!body) return;
-    const d = await api('/api/chat/group/admin/send', { method: 'POST', body: JSON.stringify({ body }) });
+    const param  = _groupTargetParam();
+    const d = await api(`/api/chat/group/admin/send${param}`, {
+      method: 'POST', body: JSON.stringify({ body }),
+    });
     if (d.ok) { input.value = ''; input.style.height = 'auto'; loadGroupMessages(); }
     else toast('❌ ' + (d.error || 'Could not send'));
   }
@@ -402,6 +510,18 @@
     this.style.height = 'auto';
     this.style.height = Math.min(this.scrollHeight, 100) + 'px';
   });
+
+  // Populate super manager-selector dropdown after managers load
+  function _populateGroupManagerSelector(managers) {
+    if (!ME || !ME.is_super) return;
+    const wrap = document.getElementById('group-manager-selector');
+    const sel  = document.getElementById('group-manager-select');
+    if (!wrap || !sel) return;
+    wrap.style.display = 'block';
+    const nonSelf = managers.filter(m => m.id !== ME.id);
+    sel.innerHTML = '<option value="">— My own group —</option>' +
+      nonSelf.map(m => `<option value="${m.id}">${esc(m.name)} (${esc(m.username)})</option>`).join('');
+  }
 
   function closeOverlays() {
     document.querySelectorAll('.overlay').forEach(o => o.classList.remove('open'));
@@ -867,6 +987,8 @@
       return;
     }
     if (!d.admins.length) { list.innerHTML = '<div class="empty-state">No managers found</div>'; return; }
+    // Also wire up the group broadcast manager selector for super
+    _populateGroupManagerSelector(d.admins);
     list.innerHTML = d.admins.map(a => `
       <div class="row-card">
         <div class="row-top">
