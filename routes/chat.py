@@ -26,6 +26,13 @@ def _group_enabled(mgr):
     return bool(mgr.get('group_enabled', True)) if mgr else False
 
 
+def _group_icon(mgr):
+    """Return the group icon URL; falls back to the app icon."""
+    if mgr and mgr.get('group_icon') and mgr['group_icon'].strip():
+        return mgr['group_icon'].strip()
+    return 'assets/icon-192.png'
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # USER — PRIVATE CHAT
 # ─────────────────────────────────────────────────────────────────────────────
@@ -169,13 +176,15 @@ def chat_previews(current_user):
                         'unread':        group_unread,
                         'manager':       manager_info,
                         'group_name':    _group_name(mgr),
+                        'group_icon':    _group_icon(mgr),
                         'group_enabled': True,
                     }
                 else:
                     group = {
                         'last_message': None, 'last_at': None, 'unread': 0,
                         'manager': manager_info,
-                        'group_name': _group_name(mgr),
+                        'group_name':    _group_name(mgr),
+                        'group_icon':    _group_icon(mgr),
                         'group_enabled': False,
                     }
 
@@ -193,7 +202,7 @@ def chat_previews(current_user):
 def group_chat_messages(current_user):
     mgr_id = current_user.get('assigned_manager_id')
     if not mgr_id:
-        return jsonify({'ok': True, 'messages': [], 'manager': None, 'group_name': None, 'group_enabled': False})
+        return jsonify({'ok': True, 'messages': [], 'manager': None, 'group_name': None, 'group_icon': 'assets/icon-192.png', 'group_enabled': False})
 
     db = get_db()
     try:
@@ -225,6 +234,7 @@ def group_chat_messages(current_user):
             'messages':      rows,
             'manager':       manager_info,
             'group_name':    _group_name(mgr),
+            'group_icon':    _group_icon(mgr),
             'group_enabled': True,
         })
     finally:
@@ -253,6 +263,7 @@ def admin_group_chat_messages(current_admin):
             'ok': True,
             'messages':      rows,
             'group_name':    _group_name(mgr) if mgr else '',
+            'group_icon':    _group_icon(mgr) if mgr else 'assets/icon-192.png',
             'group_enabled': _group_enabled(mgr) if mgr else False,
         })
     finally:
@@ -301,6 +312,7 @@ def admin_group_settings_get(current_admin):
         return jsonify({
             'ok':            True,
             'group_name':    mgr.get('group_name') or '',
+            'group_icon':    mgr.get('group_icon') or '',
             'group_enabled': _group_enabled(mgr),
         })
     finally:
@@ -322,6 +334,12 @@ def admin_group_settings_patch(current_admin):
         if len(name) > 60:
             return jsonify({'ok': False, 'error': 'Group name must be 60 characters or fewer'})
         updates['group_name'] = name or None   # store NULL when blanked out (falls back to default)
+    if 'group_icon' in data:
+        icon = (data['group_icon'] or '').strip()
+        # Accept blank (resets to default), data URIs, or https URLs
+        if icon and not (icon.startswith('data:image/') or icon.startswith('https://')):
+            return jsonify({'ok': False, 'error': 'Icon must be an image URL or uploaded image'})
+        updates['group_icon'] = icon or None   # NULL = use default app icon
     if 'group_enabled' in data:
         updates['group_enabled'] = bool(data['group_enabled'])
 
