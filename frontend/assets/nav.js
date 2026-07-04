@@ -44,7 +44,7 @@ function renderNav(activePage) {
   const pages = [
     { id: 'home',   label: 'Home',   href: 'home.html' },
     { id: 'raffle', label: 'Raffle', href: 'raffle.html' },
-    { id: 'chat',   label: 'Chat',   href: 'chat.html' },
+    { id: 'chat',   label: 'Chat',   href: 'chat-select.html' },
     { id: 'ai',     label: 'AI',     href: 'ai.html' },
     { id: 'income', label: 'Income', href: 'income.html' },
     { id: 'my',     label: 'My',     href: 'my.html' },
@@ -55,15 +55,18 @@ function renderNav(activePage) {
   nav.innerHTML = pages.map(p => {
     const iconName = NAV_ICONS[p.id];
     const isFa = iconName.startsWith('fa-');
-    
-    // Font Awesome uses <i class="...">, Lucide uses <i data-lucide="...">
-    const iconHtml = isFa 
+    const iconHtml = isFa
       ? `<i class="${iconName}"></i>`
       : `<i data-lucide="${iconName}"></i>`;
 
+    // Chat icon gets a badge wrapper so we can show unread count
+    const iconWrap = p.id === 'chat'
+      ? `<div class="nav-icon" style="position:relative">${iconHtml}<span class="chat-badge" id="nav-chat-badge" style="display:none;position:absolute;top:-4px;right:-6px;background:#e83a3a;color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:none;align-items:center;justify-content:center;padding:0 3px;line-height:16px;"></span></div>`
+      : `<div class="nav-icon">${iconHtml}</div>`;
+
     return `
       <a href="${p.href}" class="nav-item${p.id === activePage ? ' active' : ''}">
-        <div class="nav-icon">${iconHtml}</div>
+        ${iconWrap}
         <span>${p.label}</span>
       </a>
     `;
@@ -75,6 +78,32 @@ function renderNav(activePage) {
 
   // Always load Lucide for the remaining icons
   ensureLucide(() => window.lucide.createIcons());
+
+  // Poll unread count and light up the badge
+  _startChatBadgePoll();
+}
+
+let _chatBadgePollTimer = null;
+function _startChatBadgePoll() {
+  if (_chatBadgePollTimer) return; // already running
+  async function _poll() {
+    try {
+      const r = await fetch('/api/chat/unread-count');
+      if (!r.ok) return;
+      const d = await r.json();
+      const total = (d.unread || 0) + (d.group_unread || 0);
+      const badge = document.getElementById('nav-chat-badge');
+      if (!badge) return;
+      if (total > 0) {
+        badge.textContent = total > 99 ? '99+' : total;
+        badge.style.display = 'flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    } catch(_) {}
+  }
+  _poll();
+  _chatBadgePollTimer = setInterval(_poll, 8000);
 }
 
 function toast(msg) {
@@ -643,6 +672,20 @@ initWaveBg();
     meta.name = 'theme-color';
     meta.content = '#060a10';
     document.head.appendChild(meta);
+  }
+  // ── Browser tab favicon (same icon as the app icon) ──────────────────────
+  if (!document.querySelector('link[rel="icon"]')) {
+    const ico = document.createElement('link');
+    ico.rel  = 'icon';
+    ico.type = 'image/png';
+    ico.href = 'assets/icon-192.png';
+    document.head.appendChild(ico);
+  }
+  if (!document.querySelector('link[rel="apple-touch-icon"]')) {
+    const apple = document.createElement('link');
+    apple.rel  = 'apple-touch-icon';
+    apple.href = 'assets/icon-192.png';
+    document.head.appendChild(apple);
   }
 })();
 
