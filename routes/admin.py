@@ -266,6 +266,26 @@ def set_manager_visibility(current_admin, admin_id):
         if result.rowcount == 0:
             db.rollback()
             return jsonify({'ok': False, 'error': 'Manager not found'})
+        _log_action(db, current_admin, 'set_manager_visibility', f'admin_id={admin_id} can_see_all={can_see_all}')
+        db.commit()
+        return jsonify({'ok': True})
+    finally:
+        db.close()
+
+
+@admin_bp.route('/admins/visibility/all', methods=['PATCH'])
+@admin_login_required
+def set_all_managers_visibility(current_admin):
+    """Super can turn 'view all members' on/off for every manager at once,
+    instead of clicking through each one individually."""
+    if current_admin['role'] != 'super':
+        return jsonify({'ok': False, 'error': 'Only the main manager can change visibility settings'}), 403
+    data = request.get_json() or {}
+    can_see_all = bool(data.get('can_see_all', False))
+    db = get_db()
+    try:
+        db.execute("UPDATE admins SET can_see_all=? WHERE role='manager'", (can_see_all,))
+        _log_action(db, current_admin, 'set_all_managers_visibility', f'can_see_all={can_see_all}')
         db.commit()
         return jsonify({'ok': True})
     finally:
@@ -290,9 +310,10 @@ def admin_activity_log(current_admin):
             ORDER BY l.created_at DESC
             LIMIT ? OFFSET ?
         """, (limit, offset)).fetchall()
+        total = db.execute("SELECT COUNT(*) AS c FROM admin_activity_log").fetchone()['c']
         for r in rows:
             r['created_at'] = r['created_at'].strftime('%Y-%m-%d %H:%M') if r['created_at'] else None
-        return jsonify({'ok': True, 'logs': rows})
+        return jsonify({'ok': True, 'logs': rows, 'total': total, 'has_more': offset + len(rows) < total})
     finally:
         db.close()
 
@@ -394,11 +415,14 @@ def admin_users(current_admin):
             where.append("assigned_manager_id = ?")
             params.append(current_admin['id'])
 
+        count_query = "SELECT COUNT(*) AS c FROM users" + (" WHERE " + " AND ".join(where) if where else "")
+        total = db.execute(count_query, tuple(params)).fetchone()['c']
+
         query = base + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY created_at DESC LIMIT ? OFFSET ?"
         rows = db.execute(query, tuple(params + [limit, offset])).fetchall()
         for r in rows:
             r['created_at'] = r['created_at'].strftime('%Y-%m-%d') if r['created_at'] else None
-        return jsonify({'ok': True, 'users': rows})
+        return jsonify({'ok': True, 'users': rows, 'total': total, 'has_more': offset + len(rows) < total})
     finally:
         db.close()
 
@@ -582,10 +606,13 @@ def admin_delete_user(current_admin, user_id):
 @admin_bp.route('/machines', methods=['GET'])
 @admin_login_required
 def admin_list_machines(current_admin):
+    limit  = min(int(request.args.get('limit', 30)), 200)
+    offset = int(request.args.get('offset', 0))
     db = get_db()
     try:
-        rows = db.execute("SELECT * FROM machines ORDER BY series, price").fetchall()
-        return jsonify({'ok': True, 'machines': rows})
+        total = db.execute("SELECT COUNT(*) AS c FROM machines").fetchone()['c']
+        rows = db.execute("SELECT * FROM machines ORDER BY series, price LIMIT ? OFFSET ?", (limit, offset)).fetchall()
+        return jsonify({'ok': True, 'machines': rows, 'total': total, 'has_more': offset + len(rows) < total})
     finally:
         db.close()
 
@@ -716,28 +743,35 @@ def admin_update_user_machine(current_admin, um_id):
 @admin_login_required
 def admin_withdrawals(current_admin):
     status = request.args.get('status', 'pending')
+    limit  = min(int(request.args.get('limit', 30)), 200)
+    offset = int(request.args.get('offset', 0))
     db = get_db()
     try:
         is_super    = current_admin['role'] == 'super'
         can_see_all = bool(current_admin.get('can_see_all'))
         if is_super or can_see_all:
+            total = db.execute("SELECT COUNT(*) AS c FROM withdraw_requests WHERE status=?", (status,)).fetchone()['c']
             rows = db.execute("""
                 SELECT w.id, w.user_id, w.amount, w.status, w.created_at, w.processed_at,
                        u.phone, u.nick
                 FROM withdraw_requests w JOIN users u ON u.id = w.user_id
-                WHERE w.status = ? ORDER BY w.created_at ASC
-            """, (status,)).fetchall()
+                WHERE w.status = ? ORDER BY w.created_at ASC LIMIT ? OFFSET ?
+            """, (status, limit, offset)).fetchall()
         else:
+            total = db.execute("""
+                SELECT COUNT(*) AS c FROM withdraw_requests w JOIN users u ON u.id=w.user_id
+                WHERE w.status=? AND u.assigned_manager_id=?
+            """, (status, current_admin['id'])).fetchone()['c']
             rows = db.execute("""
                 SELECT w.id, w.user_id, w.amount, w.status, w.created_at, w.processed_at,
                        u.phone, u.nick
                 FROM withdraw_requests w JOIN users u ON u.id = w.user_id
-                WHERE w.status = ? AND u.assigned_manager_id = ? ORDER BY w.created_at ASC
-            """, (status, current_admin['id'])).fetchall()
+                WHERE w.status = ? AND u.assigned_manager_id = ? ORDER BY w.created_at ASC LIMIT ? OFFSET ?
+            """, (status, current_admin['id'], limit, offset)).fetchall()
         for r in rows:
             r['created_at']   = r['created_at'].strftime('%Y-%m-%d %H:%M') if r['created_at'] else None
             r['processed_at'] = r['processed_at'].strftime('%Y-%m-%d %H:%M') if r['processed_at'] else None
-        return jsonify({'ok': True, 'withdrawals': rows})
+        return jsonify({'ok': True, 'withdrawals': rows, 'total': total, 'has_more': offset + len(rows) < total})
     finally:
         db.close()
 
@@ -798,6 +832,8 @@ def reject_withdrawal(current_admin, withdraw_id):
 @admin_login_required
 def admin_deposits(current_admin):
     status = request.args.get('status', '')
+    limit  = min(int(request.args.get('limit', 30)), 200)
+    offset = int(request.args.get('offset', 0))
     db = get_db()
     try:
         where, params = [], []
@@ -809,15 +845,20 @@ def admin_deposits(current_admin):
         if not is_super and not can_see_all:
             where.append("u.assigned_manager_id=?")
             params.append(current_admin['id'])
+        where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+        total = db.execute(
+            f"SELECT COUNT(*) AS c FROM deposit_transactions d JOIN users u ON u.id=d.user_id{where_sql}",
+            tuple(params)
+        ).fetchone()['c']
         query = """
             SELECT d.*, u.phone, u.nick FROM deposit_transactions d
             JOIN users u ON u.id = d.user_id
-        """ + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY d.created_at DESC LIMIT 100"
-        rows = db.execute(query, tuple(params)).fetchall()
+        """ + where_sql + " ORDER BY d.created_at DESC LIMIT ? OFFSET ?"
+        rows = db.execute(query, tuple(params + [limit, offset])).fetchall()
         for r in rows:
             r['created_at']  = r['created_at'].strftime('%Y-%m-%d %H:%M') if r['created_at'] else None
             r['verified_at'] = r['verified_at'].strftime('%Y-%m-%d %H:%M') if r['verified_at'] else None
-        return jsonify({'ok': True, 'deposits': rows})
+        return jsonify({'ok': True, 'deposits': rows, 'total': total, 'has_more': offset + len(rows) < total})
     finally:
         db.close()
 
@@ -854,12 +895,15 @@ def admin_update_deposit_status(current_admin, deposit_id):
 @admin_bp.route('/announcements', methods=['GET'])
 @admin_login_required
 def admin_list_announcements(current_admin):
+    limit  = min(int(request.args.get('limit', 20)), 200)
+    offset = int(request.args.get('offset', 0))
     db = get_db()
     try:
-        rows = db.execute("SELECT * FROM messages ORDER BY created_at DESC").fetchall()
+        total = db.execute("SELECT COUNT(*) AS c FROM messages").fetchone()['c']
+        rows = db.execute("SELECT * FROM messages ORDER BY created_at DESC LIMIT ? OFFSET ?", (limit, offset)).fetchall()
         for r in rows:
             r['created_at'] = r['created_at'].strftime('%Y-%m-%d %H:%M') if r['created_at'] else None
-        return jsonify({'ok': True, 'announcements': rows})
+        return jsonify({'ok': True, 'announcements': rows, 'total': total, 'has_more': offset + len(rows) < total})
     finally:
         db.close()
 
@@ -922,19 +966,22 @@ def admin_delete_announcement(current_admin, msg_id):
 @admin_bp.route('/reward-codes', methods=['GET'])
 @admin_login_required
 def admin_list_reward_codes(current_admin):
+    limit  = min(int(request.args.get('limit', 20)), 200)
+    offset = int(request.args.get('offset', 0))
     db = get_db()
     try:
+        total = db.execute("SELECT COUNT(*) AS c FROM reward_codes").fetchone()['c']
         rows = db.execute("""
             SELECT rc.*, COUNT(rr.id) AS redemption_count
             FROM reward_codes rc
             LEFT JOIN reward_redemptions rr ON rr.code_id = rc.id
-            GROUP BY rc.id ORDER BY rc.created_at DESC
-        """).fetchall()
+            GROUP BY rc.id ORDER BY rc.created_at DESC LIMIT ? OFFSET ?
+        """, (limit, offset)).fetchall()
         for r in rows:
             r['valid_from']  = r['valid_from'].strftime('%Y-%m-%dT%H:%M') if r['valid_from'] else None
             r['valid_until'] = r['valid_until'].strftime('%Y-%m-%dT%H:%M') if r['valid_until'] else None
             r['created_at']  = r['created_at'].strftime('%Y-%m-%d %H:%M') if r['created_at'] else None
-        return jsonify({'ok': True, 'reward_codes': rows})
+        return jsonify({'ok': True, 'reward_codes': rows, 'total': total, 'has_more': offset + len(rows) < total})
     finally:
         db.close()
 
@@ -1026,12 +1073,23 @@ def admin_delete_reward_code(current_admin, code_id):
 @admin_bp.route('/chat/conversations', methods=['GET'])
 @admin_login_required
 def admin_chat_conversations(current_admin):
+    limit  = min(int(request.args.get('limit', 20)), 200)
+    offset = int(request.args.get('offset', 0))
     db = get_db()
     try:
         is_super    = current_admin['role'] == 'super'
         can_see_all = bool(current_admin.get('can_see_all'))
-        if is_super or can_see_all:
-            rows = db.execute("""
+        scope_sql = "" if (is_super or can_see_all) else "WHERE u.assigned_manager_id = ?"
+        scope_params = () if (is_super or can_see_all) else (current_admin['id'],)
+
+        total = db.execute(f"""
+            SELECT COUNT(DISTINCT cm.user_id) AS c
+            FROM chat_messages cm JOIN users u ON u.id = cm.user_id
+            {scope_sql}
+        """, scope_params).fetchone()['c']
+
+        rows = db.execute(f"""
+            SELECT * FROM (
                 SELECT DISTINCT ON (cm.user_id)
                        cm.user_id, u.phone, u.nick, u.avatar_url AS user_avatar,
                        cm.body AS last_message, cm.sender AS last_sender,
@@ -1042,27 +1100,16 @@ def admin_chat_conversations(current_admin):
                        ) AS unread
                 FROM chat_messages cm
                 JOIN users u ON u.id = cm.user_id
+                {scope_sql}
                 ORDER BY cm.user_id, cm.created_at DESC
-            """).fetchall()
-        else:
-            rows = db.execute("""
-                SELECT DISTINCT ON (cm.user_id)
-                       cm.user_id, u.phone, u.nick, u.avatar_url AS user_avatar,
-                       cm.body AS last_message, cm.sender AS last_sender,
-                       cm.created_at AS last_at,
-                       EXISTS (
-                           SELECT 1 FROM chat_messages x
-                           WHERE x.user_id = cm.user_id AND x.sender='user' AND x.read_by_admin=FALSE
-                       ) AS unread
-                FROM chat_messages cm
-                JOIN users u ON u.id = cm.user_id
-                WHERE u.assigned_manager_id = ?
-                ORDER BY cm.user_id, cm.created_at DESC
-            """, (current_admin['id'],)).fetchall()
-        rows.sort(key=lambda r: r['last_at'], reverse=True)
+            ) sub
+            ORDER BY last_at DESC
+            LIMIT ? OFFSET ?
+        """, scope_params + (limit, offset)).fetchall()
+
         for r in rows:
             r['last_at'] = r['last_at'].strftime('%Y-%m-%d %H:%M') if r['last_at'] else None
-        return jsonify({'ok': True, 'conversations': rows})
+        return jsonify({'ok': True, 'conversations': rows, 'total': total, 'has_more': offset + len(rows) < total})
     finally:
         db.close()
 
