@@ -67,9 +67,10 @@
 <div class="page chat-page">
   <div class="app-bar" style="gap:10px;">
     <a href="my.html" class="back-btn">‹</a>
-    <img id="mgr-avatar" src="" alt=""
+    <img id="mgr-avatar" src="assets/icon-512.png" alt=""
          style="width:34px;height:34px;border-radius:50%;object-fit:cover;
-                border:2px solid var(--cyan);display:none;flex-shrink:0;">
+                border:2px solid var(--cyan);flex-shrink:0;"
+         onerror="this.src='assets/icon-512.png'">
     <div style="flex:1;min-width:0;">
       <div class="app-bar-title" id="mgr-name" style="font-size:15px;">Manager</div>
       <div id="mgr-sub" style="font-size:11px;color:var(--text-muted);display:none;">Support</div>
@@ -150,10 +151,7 @@
         const sub = document.getElementById('mgr-sub');
         sub.style.display = 'block';
         const av = document.getElementById('mgr-avatar');
-        if (d.manager.avatar_url) {
-          av.src = d.manager.avatar_url;
-          av.style.display = 'block';
-        }
+        av.src = (d.manager.avatar_url && d.manager.avatar_url.trim()) ? d.manager.avatar_url : 'assets/icon-512.png';
       }
       renderMessages(d.messages);
     } catch (e) { /* silent — keep polling */ }
