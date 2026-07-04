@@ -307,6 +307,7 @@ def init_db():
     # Group chat customisation — manager sets their group name and can toggle it on/off
     cur.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS group_name TEXT")
     cur.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS group_enabled BOOLEAN NOT NULL DEFAULT TRUE")
+    cur.execute("ALTER TABLE admins ADD COLUMN IF NOT EXISTS group_icon TEXT")  # custom group avatar URL
     # Activity audit log — every non-super admin action, visible only to super
     cur.execute("""
         CREATE TABLE IF NOT EXISTS admin_activity_log (
