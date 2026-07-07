@@ -91,12 +91,12 @@ def get_db():
 
 def init_db():
     """
-    Called once on app startup.
-    Creates every table in Supabase Postgres if it doesn't already exist —
-    safe to run repeatedly.
+    Called once on app startup. Creates every table and runs migrations.
+    Uses the pool instead of a raw psycopg.connect() so startup doesn't
+    push the live connection count past Supabase's free-tier limit.
     """
-    conn = psycopg.connect(DATABASE_URL, sslmode='require')
-    cur = conn.cursor()
+    conn = _pool.getconn()
+    cur  = conn.cursor()
 
     # ── Users ─────────────────────────────────────────────────────────────────
     cur.execute("""
@@ -442,5 +442,5 @@ def init_db():
 
     conn.commit()
     cur.close()
-    conn.close()
+    _pool.putconn(conn)   # return to pool — not conn.close() which would destroy it
     print("[DB] All tables ready (Supabase/Postgres).")
