@@ -103,7 +103,7 @@ function _startChatBadgePoll() {
     } catch(_) {}
   }
   _poll();
-  _chatBadgePollTimer = setInterval(_poll, 8000);
+  _chatBadgePollTimer = setInterval(_poll, 60000); // 60s — badge doesn't need to be real-time
 }
 
 function toast(msg) {
