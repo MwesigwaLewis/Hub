@@ -96,7 +96,10 @@ def init_db():
     push the live connection count past Supabase's free-tier limit.
     """
     conn = _pool.getconn()
-    cur  = conn.cursor()
+    # Explicitly use the default tuple row factory here — the pool default is
+    # dict_row (for routes), but init_db uses fetchone()[0] integer indexing
+    # on COUNT(*) results, which only works with tuple rows.
+    cur  = conn.cursor(row_factory=None)
 
     # ── Users ─────────────────────────────────────────────────────────────────
     cur.execute("""
@@ -417,7 +420,7 @@ def init_db():
     if main_manager_row:
         cur.execute(
             "UPDATE users SET assigned_manager_id=%s WHERE assigned_manager_id IS NULL",
-            (main_manager_row[0],)
+            (main_manager_row[0],)   # tuple row — index 0 = id column
         )
 
     # ── Indexes ───────────────────────────────────────────────────────────────
