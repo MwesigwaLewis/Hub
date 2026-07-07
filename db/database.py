@@ -1,7 +1,7 @@
 import os
 import secrets
 import psycopg
-from psycopg.rows import dict_row
+from psycopg.rows import dict_row, tuple_row
 from psycopg_pool import ConnectionPool
 
 # Supabase gives you this under Project Settings -> Database -> Connection string.
@@ -96,10 +96,9 @@ def init_db():
     push the live connection count past Supabase's free-tier limit.
     """
     conn = _pool.getconn()
-    # Explicitly use the default tuple row factory here — the pool default is
-    # dict_row (for routes), but init_db uses fetchone()[0] integer indexing
-    # on COUNT(*) results, which only works with tuple rows.
-    cur  = conn.cursor(row_factory=None)
+    # Explicitly use tuple_row here — the pool default is dict_row (for routes),
+    # but init_db uses fetchone()[0] integer indexing on COUNT(*) results.
+    cur  = conn.cursor(row_factory=tuple_row)
 
     # ── Users ─────────────────────────────────────────────────────────────────
     cur.execute("""
