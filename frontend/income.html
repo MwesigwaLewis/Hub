@@ -196,16 +196,6 @@
   const MACHINES_INITIAL = 3;
   let allMachines = [];
 
-  async function loadOwned() {
-    try {
-      const r = await fetch('/api/my-machines');
-      const d = await r.json();
-      if (!d.ok || !d.machines.length) return;
-      allMachines = d.machines;
-      renderMachines(MACHINES_INITIAL);
-    } catch(e) {}
-  }
-
   function renderMachines(showCount) {
     const box = document.getElementById('owned-list');
     const toShow = allMachines.slice(0, showCount);
@@ -252,14 +242,6 @@
   let allTx        = [];
   let filteredTx   = [];
   let shownTx      = TX_INITIAL;
-
-  async function loadTransactions() {
-    try {
-      const r = await fetch('/api/transactions');
-      const d = await r.json();
-      if (d.ok) { allTx = d.transactions; filteredTx = allTx; renderTx(); }
-    } catch(e) {}
-  }
 
   function filterTx(type, el) {
     document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
@@ -313,22 +295,37 @@
   }
 
   // ── SUMMARY ───────────────────────────────────────────────────────────
-  async function loadSummary() {
+  // Single fetch replaces the previous 3 separate calls (/api/me,
+  // /api/my-machines, /api/transactions) — one DB round trip instead of three.
+  async function loadAll() {
     try {
-      const r = await fetch('/api/me');
+      const r = await fetch('/api/income-summary');
       const d = await r.json();
       if (!d.ok) return;
+
+      // Summary cards
       const u = d.user;
       document.getElementById('sum-ai').textContent    = fmt(u.ai_income);
       document.getElementById('sum-today').textContent = fmt(u.today_earnings);
       document.getElementById('sum-team').textContent  = fmt(u.team_income);
       document.getElementById('sum-dep').textContent   = fmt(u.total_deposit);
+
+      // Machines
+      if (d.machines && d.machines.length) {
+        allMachines = d.machines;
+        renderMachines(MACHINES_INITIAL);
+      }
+
+      // Transactions
+      if (d.transactions) {
+        allTx      = d.transactions;
+        filteredTx = allTx;
+        renderTx();
+      }
     } catch(e) {}
   }
 
-  loadSummary();
-  loadOwned();
-  loadTransactions();
+  loadAll();
 </script>
 </body>
 </html>
