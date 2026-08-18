@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Future AI Hub — Manager Dashboard</title>
+  <link rel="stylesheet" href="../assets/shared.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#060a10">
+  <style>
+    body { min-height: 100vh; }
+    .admin-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: var(--bg); z-index: 10;
+    }
+    .admin-title { font-size: 17px; font-weight: 800; color: #fff; }
+    .admin-logout { font-size: 12px; color: #ff5566; cursor: pointer; }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 12px; }
+    .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+    .stat-box .n { font-size: 18px; font-weight: 800; color: var(--cyan); }
+    .stat-box .l { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .stat-box.alert .n { color: #ffaa33; }
+
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 10px; }
+    .tab-btn {
+      padding: 8px 12px; text-align: center; font-size: 12px; font-weight: 700;
+      border-radius: 8px; border: 1px solid var(--border); color: #8aaabb; cursor: pointer;
+      background: var(--surface);
+    }
+    .tab-btn.active { background: var(--cyan); color: #04121c; border-color: var(--cyan); }
+
+    .tab-panel { display: none; padding: 0 12px 24px; }
+    .tab-panel.active { display: block; }
+
+    .section-head { display: flex; justify-content: space-between; align-items: center; margin: 4px 0 10px; }
+    .section-head h3 { font-size: 14px; color: #fff; margin: 0; }
+    .add-btn {
+      font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 8px;
+      border: 1px solid var(--cyan); background: transparent; color: var(--cyan); cursor: pointer;
+    }
+
+    /* Inbox */
+    .conv-row {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px; margin-bottom: 8px; cursor: pointer;
+    }
+    .conv-row.unread { border-color: var(--cyan); }
+    .conv-phone { font-weight: 700; color: #fff; font-size: 13px; }
+    .conv-preview { font-size: 12px; color: #7f9cb0; margin-top: 3px; max-width: 220px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .conv-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); flex-shrink: 0; }
+
+    /* Overlays (thread / user detail / add-machine / add-manager) */
+    .overlay {
+      position: fixed; inset: 0; background: #000c; z-index: 50;
+      display: none; flex-direction: column;
+    }
+    .overlay.open { display: flex; }
+    .overlay-scroll { flex: 1; overflow-y: auto; padding: 12px; }
+
+    .thread-scroll { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .thread-bubble-row { display: flex; }
+    .thread-bubble-row.mine { justify-content: flex-end; }
+    .thread-bubble { max-width: 78%; padding: 9px 12px; border-radius: 12px; font-size: 13px; white-space: pre-wrap; }
+    .thread-bubble-row.theirs .thread-bubble { background: var(--surface); border: 1px solid var(--border); color: #eaf6ff; }
+    .thread-bubble-row.mine .thread-bubble { background: var(--cyan); color: #04121c; font-weight: 500; }
+    .thread-input-bar { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--border); background: var(--bg); }
+    .thread-input { flex: 1; padding: 10px 14px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border); color: #fff; font-size: 13px; }
+    .thread-send { padding: 0 16px; border-radius: 20px; border: none; background: var(--cyan); color: #04121c; font-weight: 700; cursor: pointer; }
+
+    /* Generic rows */
+    .row-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 8px; }
+    .row-top { display: flex; justify-content: space-between; align-items: center; }
+    .row-amount { font-weight: 800; color: var(--cyan); font-size: 15px; }
+    .row-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+    .row-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .act-btn { flex: 1; padding: 8px 0; border-radius: 8px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; min-width: 80px; }
+    .act-approve { background: #003322; color: #44ee88; border: 1px solid #33cc66; }
+    .act-reject { background: #220011; color: #ee4444; border: 1px solid #cc3333; }
+    .act-neutral { background: #0e1828; color: #8aaabb; border: 1px solid var(--border); }
+    .status-pill { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+    .pill-successful, .pill-approved, .pill-running { background: #003322; color: #44ee88; }
+    .pill-pending { background: #2a2200; color: #ffcc44; }
+    .pill-failed, .pill-rejected, .pill-expired { background: #220011; color: #ee4444; }
+
+    .search-bar { padding: 0 0 10px; }
+    .search-bar input, .form-field input, .form-field textarea, .form-field select {
+      width: 100%; padding: 9px 12px; border-radius: 10px; background: #041220;
+      border: 1px solid var(--border); color: #fff; font-size: 13px; box-sizing: border-box;
+      font-family: inherit;
+    }
+    .form-field { margin-bottom: 10px; }
+    .form-field label { display: block; font-size: 11px; color: #8aaabb; margin-bottom: 5px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-actions { display: flex; gap: 8px; margin-top: 6px; }
+    .btn-primary { flex: 1; padding: 11px; border: none; border-radius: 10px; background: var(--cyan); color: #04121c; font-weight: 700; font-size: 13px; cursor: pointer; }
+    .btn-danger { flex: 1; padding: 11px; border: 1px solid #cc3333; border-radius: 10px; background: #220011; color: #ee4444; font-weight: 700; font-size: 13px; cursor: pointer; }
+    .btn-secondary { flex: 1; padding: 11px; border: 1px solid var(--border); border-radius: 10px; background: #0e1828; color: #8aaabb; font-weight: 700; font-size: 13px; cursor: pointer; }
+
+    .divider { border-top: 1px solid var(--border); margin: 16px 0; }
+    .sub-heading { font-size: 12px; font-weight: 700; color: var(--cyan); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .empty-state { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+    .mini-note { font-size: 11px; color: #5a8aaa; margin-top: -4px; margin-bottom: 10px; }
+
+    .load-more-btn {
+      display: block; width: 100%; margin-top: 4px; padding: 11px;
+      border-radius: 10px; border: 1px solid var(--border); background: var(--surface);
+      color: var(--cyan); font-weight: 700; font-size: 13px; cursor: pointer;
+    }
+    .load-more-btn:active { opacity: 0.8; }
+
+    .toggle-switch {
+      position: relative; width: 40px; height: 22px; flex-shrink: 0;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; background: #23384a; border-radius: 22px;
+      cursor: pointer; transition: 0.15s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px;
+      background: #fff; border-radius: 50%; transition: 0.15s;
+    }
+    .toggle-switch input:checked + .toggle-slider { background: var(--cyan); }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+    .avatar-thumb {
+      width: 36px; height: 36px; border-radius: 50%; object-fit: cover;
+      border: 1px solid var(--border-cyan); flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="page">
+<div class="admin-bar">
+  <div class="admin-title">Manager Dashboard</div>
+  <div class="admin-logout" id="logout-btn">Log out</div>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-box"><div class="n" id="s-users">—</div><div class="l">Total Users</div></div>
+  <div class="stat-box"><div class="n" id="s-deposits">—</div><div class="l">Total Deposits</div></div>
+  <div class="stat-box"><div class="n" id="s-withdrawn">—</div><div class="l">Total Withdrawn</div></div>
+  <div class="stat-box alert"><div class="n" id="s-pending">—</div><div class="l">Pending Withdrawals</div></div>
+</div>
+
+<div class="tabs">
+  <div class="tab-btn active" data-tab="inbox">Inbox <span id="tab-unread-badge"></span></div>
+  <div class="tab-btn" data-tab="group-broadcast">Group Broadcast</div>
+  <div class="tab-btn" data-tab="withdrawals">Withdrawals</div>
+  <div class="tab-btn" data-tab="users">Users</div>
+  <div class="tab-btn" data-tab="machines">Machines</div>
+  <div class="tab-btn" data-tab="deposits">Deposits</div>
+  <div class="tab-btn" data-tab="managers" id="tab-btn-managers" style="display:none">Managers</div>
+  <div class="tab-btn" data-tab="announcements">Announcements</div>
+  <div class="tab-btn" data-tab="rewards">Reward Codes</div>
+  <div class="tab-btn" data-tab="activity" id="tab-btn-activity" style="display:none">Activity Log</div>
+  <div class="tab-btn" data-tab="profile">My Profile</div>
+</div>
+
+<!-- INBOX -->
+<div class="tab-panel active" id="panel-inbox">
+  <div id="conv-list"><div class="empty-state">No conversations yet</div></div>
+  <button class="load-more-btn" id="inbox-load-more" style="display:none" onclick="loadConversations(true)">Load More</button>
+</div>
+
+<!-- GROUP BROADCAST -->
+<div class="tab-panel" id="panel-group-broadcast">
+  <!-- Settings bar -->
+  <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:10px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <span style="font-size:13px;font-weight:600;color:#c8e4f4;">Group Chat</span>
+      <!-- Enabled toggle -->
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+        <span id="group-enabled-label" style="font-size:12px;color:var(--text-muted);">Enabled</span>
+        <div id="group-toggle-track" onclick="toggleGroupEnabled()"
+             style="width:44px;height:24px;border-radius:12px;background:#1a3050;position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;">
+          <div id="group-toggle-thumb"
+               style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;"></div>
+        </div>
+      </label>
+    </div>
+    <!-- Group name field -->
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input id="group-name-input" class="field" style="flex:1;height:36px;padding:0 12px;font-size:13px;"
+             placeholder="Group name (default: Manager Name Group)" maxlength="60">
+      <button class="btn" onclick="saveGroupName()" style="padding:7px 14px;font-size:13px;white-space:nowrap;">Save Name</button>
+    </div>
+    <!-- Group icon field -->
+    <div style="display:flex;gap:8px;align-items:center;">
+      <img id="group-icon-preview" src="assets/icon-192.png" alt="Group icon"
+           style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--border-cyan);flex-shrink:0;">
+      <input id="group-icon-input" class="field" style="flex:1;height:36px;padding:0 12px;font-size:13px;"
+             placeholder="Group icon URL (leave blank to use app icon)">
+      <label class="btn" style="padding:7px 10px;font-size:12px;white-space:nowrap;cursor:pointer;">
+        Upload
+        <input type="file" accept="image/*" style="display:none" onchange="uploadGroupIcon(this)">
+      </label>
+      <button class="btn" onclick="saveGroupIcon()" style="padding:7px 14px;font-size:13px;white-space:nowrap;">Save Icon</button>
+    </div>
+    <!-- Super-only: manager selector -->
+    <div id="group-manager-selector" style="display:none;">
+      <select id="group-manager-select" class="field" style="width:100%;height:36px;padding:0 10px;font-size:13px;"
+              onchange="loadGroupMessages()">
+        <option value="">— My own group —</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Disabled notice -->
+  <div id="group-disabled-notice" style="display:none;padding:14px;text-align:center;font-size:13px;color:#e87a3a;border-bottom:1px solid var(--border);">
+    ⚠️ Group chat is currently <strong>disabled</strong>. Members cannot see or access this channel.
+  </div>
+
+  <div style="font-size:12px;color:var(--text-muted);padding:8px 14px 2px;">
+    Messages sent here go to <strong>all your members</strong> as a read-only broadcast.
+  </div>
+
+  <div id="group-chat-scroll" style="display:flex;flex-direction:column;gap:8px;padding:8px 10px;max-height:45vh;overflow-y:auto;">
+    <div class="empty-state" id="group-chat-empty">No group messages yet</div>
+  </div>
+
+  <div id="group-send-bar" style="display:flex;gap:8px;padding:10px;border-top:1px solid var(--border);">
+    <textarea id="group-chat-input" class="field" style="flex:1;resize:none;min-height:40px;max-height:100px;border-radius:10px;padding:10px 14px;" placeholder="Broadcast a message to your team…" rows="1"></textarea>
+    <button class="btn" onclick="sendGroupMessage()" style="align-self:flex-end;padding:10px 16px;">Send</button>
+  </div>
+</div>
+
+<!-- WITHDRAWALS -->
+<div class="tab-panel" id="panel-withdrawals">
+  <div id="withdraw-list"><div class="empty-state">No pending withdrawals</div></div>
+  <button class="load-more-btn" id="withdrawals-load-more" style="display:none" onclick="loadWithdrawals(true)">Load More</button>
+</div>
+
+<!-- USERS -->
+<div class="tab-panel" id="panel-users">
+  <div class="search-bar"><input id="user-search" placeholder="Search phone or nickname…"></div>
+  <div class="search-bar" id="manager-filter-bar" style="display:none">
+    <select id="manager-filter">
+      <option value="">All Managers</option>
+      <option value="unassigned">Unassigned</option>
+    </select>
+  </div>
+  <div id="user-list"><div class="empty-state">Loading…</div></div>
+  <button class="load-more-btn" id="users-load-more" style="display:none" onclick="loadUsers(undefined, undefined, true)">Load More</button>
+</div>
+<div class="tab-panel" id="panel-machines">
+  <div class="section-head">
+    <h3>Machine Catalogue</h3>
+    <button class="add-btn" onclick="openAddMachine()">+ Add Machine</button>
+  </div>
+  <div id="machine-list"><div class="empty-state">Loading…</div></div>
+  <button class="load-more-btn" id="machines-load-more" style="display:none" onclick="loadMachines(true)">Load More</button>
+</div>
+<div class="tab-panel" id="panel-deposits">
+  <div id="deposit-list"><div class="empty-state">Loading…</div></div>
+  <button class="load-more-btn" id="deposits-load-more" style="display:none" onclick="loadDeposits(true)">Load More</button>
+</div>
+
+<!-- MANAGERS -->
+<div class="tab-panel" id="panel-managers">
+  <div class="section-head">
+    <h3>Manager Accounts</h3>
+    <button class="add-btn" onclick="openAddManager()">+ Add Manager</button>
+  </div>
+  <div class="row-card">
+    <div class="row-sub" style="margin-bottom:8px">"View All Members" lets a manager see every user across every batch, not just their own — off by default.</div>
+    <div class="row-actions">
+      <button class="act-btn act-approve" onclick="bulkSetVisibility(true)">Enable for All</button>
+      <button class="act-btn act-reject" onclick="bulkSetVisibility(false)">Disable for All</button>
+    </div>
+  </div>
+  <div id="manager-list"><div class="empty-state">Loading…</div></div>
+</div>
+
+<!-- ANNOUNCEMENTS -->
+<div class="tab-panel" id="panel-announcements">
+  <div class="section-head">
+    <h3>Announcements</h3>
+    <button class="add-btn" onclick="openAddAnnouncement()">+ New</button>
+  </div>
+  <div id="announcement-list"><div class="empty-state">Loading…</div></div>
+  <button class="load-more-btn" id="announcements-load-more" style="display:none" onclick="loadAnnouncements(true)">Load More</button>
+</div>
+<div class="tab-panel" id="panel-rewards">
+  <div class="section-head">
+    <h3>Reward Codes</h3>
+    <button class="add-btn" onclick="openAddRewardCode()">+ Create Code</button>
+  </div>
+  <div id="reward-code-list"><div class="empty-state">Loading…</div></div>
+  <button class="load-more-btn" id="rewards-load-more" style="display:none" onclick="loadRewardCodes(true)">Load More</button>
+</div>
+
+<!-- ACTIVITY LOG (main manager only) -->
+<div class="tab-panel" id="panel-activity">
+  <div class="section-head"><h3>Activity Log</h3></div>
+  <div class="mini-note">Every action other managers take, recorded silently — they never see this.</div>
+  <div id="activity-list"><div class="empty-state">Loading…</div></div>
+  <button class="load-more-btn" id="activity-load-more" style="display:none" onclick="loadActivityLog(true)">Load More</button>
+</div>
+
+<!-- MY PROFILE -->
+<div class="tab-panel" id="panel-profile">
+  <div class="section-head"><h3>My Profile</h3></div>
+  <div class="row-card" style="text-align:center; padding:20px 12px;">
+    <img id="profile-avatar-preview" src="../assets/icon-512.png" alt="Avatar"
+         style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--border-cyan);margin-bottom:12px;">
+    <div class="form-field" style="text-align:left"><label>Display Name</label><input id="profile-name"></div>
+    <div class="form-field" style="text-align:left"><label>Avatar URL</label><input id="profile-avatar-url" placeholder="https://…"></div>
+    <div class="mini-note" style="text-align:left">Shown to users in chat and on the Manager page. Leave blank to use the default app icon.</div>
+    <div class="form-actions"><button class="btn-primary" onclick="saveProfile()">Save Profile</button></div>
+  </div>
+</div>
+</div>
+
+<!-- ═══ Chat thread overlay ═══ -->
+<div class="overlay" id="thread-overlay">
+  <div class="admin-bar">
+    <div class="admin-title" id="thread-title">Chat</div>
+    <div class="admin-logout" id="thread-close" style="color:#8aaabb">Close</div>
+  </div>
+  <div class="thread-scroll" id="thread-scroll"></div>
+  <div class="thread-input-bar">
+    <input class="thread-input" id="thread-input" placeholder="Reply…">
+    <button class="thread-send" id="thread-send-btn">Send</button>
+  </div>
+</div>
+
+<!-- ═══ User detail / edit overlay ═══ -->
+<div class="overlay" id="user-overlay">
+  <div class="admin-bar">
+    <div class="admin-title" id="user-overlay-title">User</div>
+    <div class="admin-logout" id="user-overlay-close" style="color:#8aaabb">Close</div>
+  </div>
+  <div class="overlay-scroll" id="user-overlay-body"></div>
+</div>
+
+<!-- ═══ Generic form overlay (add machine / add manager / add announcement) ═══ -->
+<div class="overlay" id="form-overlay">
+  <div class="admin-bar">
+    <div class="admin-title" id="form-overlay-title">Add</div>
+    <div class="admin-logout" id="form-overlay-close" style="color:#8aaabb">Close</div>
+  </div>
+  <div class="overlay-scroll" id="form-overlay-body"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const fmt = n => parseFloat(n || 0).toLocaleString();
+  const esc = s => { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; };
+
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2400);
+  }
+
+  async function api(url, opts) {
+    let r;
+    try {
+      r = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' },
+        ...opts,
+      });
+    } catch (networkErr) {
+      // fetch() itself failed — offline, DNS, CORS, etc. Never let this
+      // escape as a rejected promise; every caller expects a plain object.
+      return { ok: false, error: 'Connection error — check your network and try again', status: 0 };
+    }
+
+    try {
+      const data = await r.json();
+      if (!('status' in data)) data.status = r.status;
+      return data;
+    } catch (parseErr) {
+      // Body wasn't valid JSON — almost always a Flask 500 HTML error page
+      // (or a proxy/timeout page). Previously this threw a SyntaxError that
+      // bubbled up to the auth guard's .catch() and redirected to login,
+      // making any transient server error look like "the dashboard doesn't
+      // work at all." Now it's just a normal {ok:false} result instead.
+      return { ok: false, error: `Server error (${r.status})`, status: r.status };
+    }
+  }
+
+  // Installable as a PWA (manifest.json above) — no in-app "Download App"
+  // button here on purpose; managers who want it just use their browser's
+  // own "Install app" / "Add to Home Screen" menu option.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
+
+  // ── Auth guard ────────────────────────────────────────────────────────────
+  let ME = null;
+  api('/api/admin/me').then(d => {
+    if (!d.ok) {
+      if (d.status === 401) {
+        // Genuinely not authenticated — this is the only case that should
+        // send the admin back to login.
+        window.location.href = 'login.html';
+      } else {
+        // Transient server/connection error — don't boot the admin out for
+        // a blip. Show it and retry shortly instead.
+        toast('❌ ' + (d.error || 'Could not reach the server') + ' — retrying…');
+        setTimeout(() => window.location.reload(), 3000);
+      }
+      return;
+    }
+    ME = d;
+    if (ME.is_super) {
+      document.getElementById('tab-btn-managers').style.display = '';
+      document.getElementById('tab-btn-activity').style.display = '';
+    }
+    initManagerFilter();
+    loadProfileForm();
+    refreshAll();
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await api('/api/admin/logout', { method: 'POST' });
+    window.location.href = 'login.html';
+  });
+
+  function refreshAll() {
+    loadStats(); loadConversations(); loadWithdrawals();
+    loadUsers(); loadMachines(); loadDeposits(); loadAnnouncements(); loadRewardCodes();
+    if (ME && ME.is_super) { loadManagers(); loadActivityLog(); }
+  }
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'group-broadcast') loadGroupMessages();
+    });
+  });
+
+  /* ══════════════════════ GROUP BROADCAST ══════════════════════ */
+  let _groupEnabled = true;
+
+  function _groupTargetParam() {
+    // Super can act on a specific manager's group via the dropdown
+    if (ME && ME.is_super) {
+      const sel = document.getElementById('group-manager-select');
+      const val = sel ? sel.value : '';
+      return val ? `?manager_id=${val}` : '';
+    }
+    return '';
+  }
+
+  async function loadGroupMessages() {
+    const scroll = document.getElementById('group-chat-scroll');
+    const empty  = document.getElementById('group-chat-empty');
+    const param  = _groupTargetParam();
+    const d = await api(`/api/chat/group/admin/messages${param}`);
+    if (!d.ok) return;
+
+    // Sync settings UI
+    _groupEnabled = d.group_enabled;
+    _applyGroupEnabledUI(d.group_enabled);
+    if (d.group_name !== undefined) {
+      document.getElementById('group-name-input').value = d.group_name || '';
+    }
+    if (d.group_icon !== undefined) {
+      const iconVal = d.group_icon || '';
+      document.getElementById('group-icon-input').value = iconVal;
+      document.getElementById('group-icon-preview').src = iconVal || 'assets/icon-192.png';
+    }
+
+    if (!d.messages.length) { empty.style.display = 'flex'; return; }
+    empty.style.display = 'none';
+    scroll.querySelectorAll('.gc-bubble').forEach(el => el.remove());
+    d.messages.forEach(m => {
+      const div = document.createElement('div');
+      div.className = 'gc-bubble';
+      div.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 14px;';
+      div.innerHTML = `<div style="font-size:13px;color:#d8f0ff;white-space:pre-wrap;word-break:break-word">${esc(m.body)}</div><div style="font-size:10px;color:var(--text-muted);margin-top:4px">${m.created_at}</div>`;
+      scroll.appendChild(div);
+    });
+    scroll.scrollTop = scroll.scrollHeight;
+  }
+
+  function _applyGroupEnabledUI(enabled) {
+    const track  = document.getElementById('group-toggle-track');
+    const thumb  = document.getElementById('group-toggle-thumb');
+    const label  = document.getElementById('group-enabled-label');
+    const notice = document.getElementById('group-disabled-notice');
+    const sendBar = document.getElementById('group-send-bar');
+    if (!track) return;
+    if (enabled) {
+      track.style.background = 'var(--cyan)';
+      thumb.style.left = '22px';
+      label.textContent = 'Enabled';
+      label.style.color = 'var(--cyan)';
+      notice.style.display = 'none';
+      // Super can still send to disabled group; others see no send bar when disabled
+      sendBar.style.display = 'flex';
+    } else {
+      track.style.background = '#1a3050';
+      thumb.style.left = '2px';
+      label.textContent = 'Disabled';
+      label.style.color = '#e87a3a';
+      notice.style.display = 'block';
+      // Super always sees send bar; others don't when disabled
+      sendBar.style.display = (ME && ME.is_super) ? 'flex' : 'none';
+    }
+  }
+
+  async function toggleGroupEnabled() {
+    const newVal = !_groupEnabled;
+    const param  = _groupTargetParam();
+    const d = await api(`/api/chat/group/admin/settings${param}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ group_enabled: newVal }),
+    });
+    if (d.ok) { _groupEnabled = newVal; _applyGroupEnabledUI(newVal); }
+    else toast('❌ ' + (d.error || 'Could not update setting'));
+  }
+
+  async function saveGroupName() {
+    const name  = document.getElementById('group-name-input').value.trim();
+    const param = _groupTargetParam();
+    const d = await api(`/api/chat/group/admin/settings${param}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ group_name: name }),
+    });
+    if (d.ok) toast('✅ Group name saved');
+    else toast('❌ ' + (d.error || 'Could not save name'));
+  }
+
+  function uploadGroupIcon(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast('Image must be under 2 MB'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      document.getElementById('group-icon-input').value = dataUrl;
+      document.getElementById('group-icon-preview').src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function saveGroupIcon() {
+    const icon  = document.getElementById('group-icon-input').value.trim();
+    const param = _groupTargetParam();
+    const d = await api(`/api/chat/group/admin/settings${param}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ group_icon: icon }),   // blank = reset to default
+    });
+    if (d.ok) {
+      toast('✅ Group icon saved');
+      const preview = document.getElementById('group-icon-preview');
+      preview.src = icon || 'assets/icon-192.png';
+    } else {
+      toast('❌ ' + (d.error || 'Could not save icon'));
+    }
+  }
+
+  async function sendGroupMessage() {
+    const input  = document.getElementById('group-chat-input');
+    const body   = input.value.trim();
+    if (!body) return;
+    const param  = _groupTargetParam();
+    const d = await api(`/api/chat/group/admin/send${param}`, {
+      method: 'POST', body: JSON.stringify({ body }),
+    });
+    if (d.ok) { input.value = ''; input.style.height = 'auto'; loadGroupMessages(); }
+    else toast('❌ ' + (d.error || 'Could not send'));
+  }
+
+  document.getElementById('group-chat-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendGroupMessage(); }
+  });
+  document.getElementById('group-chat-input').addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+  });
+
+  // Populate super manager-selector dropdown after managers load
+  function _populateGroupManagerSelector(managers) {
+    if (!ME || !ME.is_super) return;
+    const wrap = document.getElementById('group-manager-selector');
+    const sel  = document.getElementById('group-manager-select');
+    if (!wrap || !sel) return;
+    wrap.style.display = 'block';
+    const nonSelf = managers.filter(m => m.id !== ME.id);
+    sel.innerHTML = '<option value="">— My own group —</option>' +
+      nonSelf.map(m => `<option value="${m.id}">${esc(m.name)} (${esc(m.username)})</option>`).join('');
+  }
+
+  function closeOverlays() {
+    document.querySelectorAll('.overlay').forEach(o => o.classList.remove('open'));
+  }
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  async function loadStats() {
+    const d = await api('/api/admin/stats');
+    if (!d.ok) return;
+    document.getElementById('s-users').textContent = d.users_count;
+    document.getElementById('s-deposits').textContent = fmt(d.total_deposits);
+    document.getElementById('s-withdrawn').textContent = fmt(d.total_withdrawn);
+    document.getElementById('s-pending').textContent = d.pending_withdraws;
+    document.getElementById('tab-unread-badge').textContent = d.unread_chats > 0 ? `(${d.unread_chats})` : '';
+  }
+
+  /* ══════════════════════ INBOX ══════════════════════ */
+  let inboxOffset = 0;
+  const INBOX_PAGE = 20;
+  async function loadConversations(more) {
+    if (!more) inboxOffset = 0;
+    const d = await api(`/api/admin/chat/conversations?limit=${INBOX_PAGE}&offset=${inboxOffset}`);
+    const list = document.getElementById('conv-list');
+    const btn = document.getElementById('inbox-load-more');
+    if (!d.ok) { list.innerHTML = '<div class="empty-state">Could not load conversations</div>'; btn.style.display = 'none'; return; }
+    const html = d.conversations.map(c => `
+      <div class="conv-row ${c.unread ? 'unread' : ''}" onclick="openThread(${c.user_id}, '${esc(c.nick || c.phone)}')">
+        <img class="avatar-thumb" src="${avatarSrc(c.user_avatar)}" onerror="this.src='../assets/icon-512.png'">
+        <div style="flex:1">
+          <div class="conv-phone">${esc(c.phone)}</div>
+          <div class="conv-preview">${c.last_sender === 'admin' ? 'You: ' : ''}${esc((c.last_message || '').slice(0, 60))}</div>
+        </div>
+        ${c.unread ? '<div class="conv-dot"></div>' : ''}
+      </div>
+    `).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No conversations yet</div>'; }
+    inboxOffset += d.conversations.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
+  }
+
+  let currentThreadUserId = null;
+  window.openThread = async function (userId, label) {
+    currentThreadUserId = userId;
+    document.getElementById('thread-title').textContent = label;
+    document.getElementById('thread-overlay').classList.add('open');
+    await loadThread();
+  };
+  async function loadThread() {
+    const d = await api(`/api/admin/chat/${currentThreadUserId}`);
+    const scroll = document.getElementById('thread-scroll');
+    if (!d.ok) { scroll.innerHTML = '<div class="empty-state">Could not load messages</div>'; return; }
+    scroll.innerHTML = d.messages.map(m => `
+      <div class="thread-bubble-row ${m.sender === 'admin' ? 'mine' : 'theirs'}">
+        <div class="thread-bubble">${esc(m.body)}</div>
+      </div>
+    `).join('') || '<div class="empty-state">No messages yet</div>';
+    scroll.scrollTop = scroll.scrollHeight;
+  }
+  document.getElementById('thread-close').addEventListener('click', () => {
+    closeOverlays(); loadConversations(); loadStats();
+  });
+  async function sendThreadReply() {
+    const input = document.getElementById('thread-input');
+    const body = input.value.trim();
+    if (!body || !currentThreadUserId) return;
+    input.value = '';
+    const d = await api(`/api/admin/chat/${currentThreadUserId}/send`, { method: 'POST', body: JSON.stringify({ body }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Could not send')); return; }
+    loadThread();
+  }
+  document.getElementById('thread-send-btn').addEventListener('click', sendThreadReply);
+  document.getElementById('thread-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendThreadReply(); });
+
+  /* ══════════════════════ WITHDRAWALS ══════════════════════ */
+  let withdrawalsOffset = 0;
+  const WITHDRAWALS_PAGE = 20;
+  async function loadWithdrawals(more) {
+    if (!more) withdrawalsOffset = 0;
+    const d = await api(`/api/admin/withdrawals?status=pending&limit=${WITHDRAWALS_PAGE}&offset=${withdrawalsOffset}`);
+    const list = document.getElementById('withdraw-list');
+    const btn = document.getElementById('withdrawals-load-more');
+    if (!d.ok) { list.innerHTML = '<div class="empty-state">Could not load withdrawals</div>'; btn.style.display = 'none'; return; }
+    const html = d.withdrawals.map(w => `
+      <div class="row-card">
+        <div class="row-top"><span class="row-amount">${fmt(w.amount)}</span><span class="row-sub">${w.created_at}</span></div>
+        <div class="row-sub">${esc(w.phone)} ${w.nick ? '· ' + esc(w.nick) : ''}</div>
+        <div class="row-actions">
+          <button class="act-btn act-approve" onclick="processWithdrawal(${w.id}, 'approve')">Approve</button>
+          <button class="act-btn act-reject" onclick="processWithdrawal(${w.id}, 'reject')">Reject & Refund</button>
+        </div>
+      </div>
+    `).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No pending withdrawals</div>'; }
+    withdrawalsOffset += d.withdrawals.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
+  }
+  window.processWithdrawal = async function (id, action) {
+    const d = await api(`/api/admin/withdrawals/${id}/${action}`, { method: 'POST' });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast(action === 'approve' ? '✅ Approved' : '↩️ Rejected & refunded');
+    loadWithdrawals(); loadStats();
+  };
+
+  /* ══════════════════════ USERS ══════════════════════ */
+  let managersById = {};
+
+  let usersOffset = 0;
+  let usersLastSearch = '';
+  let usersLastManager = '';
+  const USERS_PAGE = 30;
+
+  async function loadUsers(search, managerId, more) {
+    const filterEl = document.getElementById('manager-filter');
+    const effectiveManager = managerId !== undefined ? managerId : (filterEl ? filterEl.value : '');
+    if (managerId !== undefined && filterEl) filterEl.value = managerId;
+
+    if (!more) {
+      usersOffset = 0;
+      usersLastSearch = search || '';
+      usersLastManager = effectiveManager || '';
+    }
+
+    const params = new URLSearchParams();
+    if (usersLastSearch) params.set('search', usersLastSearch);
+    if (usersLastManager) params.set('manager', usersLastManager);
+    params.set('limit', USERS_PAGE);
+    params.set('offset', usersOffset);
+
+    const d = await api('/api/admin/users?' + params.toString());
+    const list = document.getElementById('user-list');
+    const btn = document.getElementById('users-load-more');
+    if (!d.ok) { list.innerHTML = '<div class="empty-state">Could not load users</div>'; btn.style.display = 'none'; return; }
+    const html = d.users.map(u => {
+      const mgrName = u.assigned_manager_id ? (managersById[u.assigned_manager_id] || `#${u.assigned_manager_id}`) : 'Unassigned';
+      return `
+      <div class="row-card" onclick="openUserDetail(${u.id})" style="cursor:pointer">
+        <div class="row-top">
+          <div style="display:flex;align-items:center;gap:8px">
+            <img class="avatar-thumb" src="${avatarSrc(u.avatar_url)}" onerror="this.src='../assets/icon-512.png'">
+            <span class="row-amount">${fmt(u.balance)}</span>
+          </div>
+          <span class="row-sub">Joined ${u.created_at}</span>
+        </div>
+        <div class="row-sub">${esc(u.phone)} ${u.nick ? '· ' + esc(u.nick) : ''} · VIP ${u.vip_level}</div>
+        <div class="row-sub">Deposited ${fmt(u.total_deposit)} · Withdrawn ${fmt(u.total_withdraw)} · AI income ${fmt(u.ai_income)} · ${u.invite_count} invites</div>
+        ${ME && ME.is_super ? `<div class="row-sub">Manager: <b style="color:var(--cyan)">${esc(mgrName)}</b></div>` : ''}
+      </div>
+    `;
+    }).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No users found</div>'; }
+    usersOffset += d.users.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
+  }
+  let searchTimer = null;
+  document.getElementById('user-search').addEventListener('input', (e) => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => loadUsers(e.target.value.trim()), 300);
+  });
+
+  async function initManagerFilter() {
+    if (!ME || !ME.is_super) return;
+    document.getElementById('manager-filter-bar').style.display = 'block';
+    const d = await api('/api/admin/admins');
+    if (!d.ok) return;
+    const select = document.getElementById('manager-filter');
+    d.admins.forEach(a => {
+      managersById[a.id] = a.name;
+      const opt = document.createElement('option');
+      opt.value = a.id;
+      opt.textContent = `${a.name} (${a.batch_size})`;
+      select.appendChild(opt);
+    });
+    select.addEventListener('change', () => loadUsers(document.getElementById('user-search').value.trim(), select.value));
+  }
+
+  const USER_FIELD_LABELS = {
+    phone: 'Phone', nick: 'Nickname', avatar_url: 'Avatar URL', email: 'Email', vip_level: 'VIP Level',
+    depositing_invites: 'Depositing Invites (drives VIP level)',
+    balance: 'Balance', wallet: 'Wallet', total_deposit: 'Total Deposit',
+    total_withdraw: 'Total Withdraw', ai_income: 'AI Income', today_earnings: "Today's Earnings",
+    team_income: 'Team Income', invite_count: 'Invite Count', team_count: 'Team Count',
+    raffle_ready: 'Raffle Tickets', last_salary: 'Last Salary', this_salary: 'This Salary',
+  };
+
+  window.openUserDetail = async function (userId) {
+    document.getElementById('user-overlay').classList.add('open');
+    document.getElementById('user-overlay-body').innerHTML = '<div class="empty-state">Loading…</div>';
+    const d = await api(`/api/admin/users/${userId}`);
+    if (!d.ok) { document.getElementById('user-overlay-body').innerHTML = '<div class="empty-state">Could not load user</div>'; return; }
+
+    const u = d.user;
+    document.getElementById('user-overlay-title').textContent = u.nick || u.phone;
+
+    const fieldsHtml = Object.entries(USER_FIELD_LABELS).map(([key, label]) => `
+      <div class="form-field">
+        <label>${label}</label>
+        <input data-field="${key}" value="${esc(u[key])}">
+      </div>
+    `).join('');
+
+    const machinesHtml = d.machines.length ? d.machines.map(m => `
+      <div class="row-card">
+        <div class="row-top">
+          <span style="color:var(--cyan);font-weight:700">${esc(m.machine_id)}</span>
+          <span class="status-pill pill-${m.status}">${m.status}</span>
+        </div>
+        <div class="row-sub">Bought ${m.bought_at} · Expires ${m.expires_at || '—'}</div>
+        <div class="form-grid" style="margin-top:8px">
+          <div class="form-field"><label>Daily Income</label><input data-um-field="daily_income" data-um-id="${m.id}" value="${m.daily_income}"></div>
+          <div class="form-field"><label>Total Income</label><input data-um-field="total_income" data-um-id="${m.id}" value="${m.total_income}"></div>
+          <div class="form-field"><label>Earned</label><input data-um-field="earned" data-um-id="${m.id}" value="${m.earned}"></div>
+          <div class="form-field">
+            <label>Status</label>
+            <select data-um-field="status" data-um-id="${m.id}">
+              <option value="running" ${m.status === 'running' ? 'selected' : ''}>running</option>
+              <option value="expired" ${m.status === 'expired' ? 'selected' : ''}>expired</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-secondary" style="width:100%" onclick="saveUserMachine(${m.id})">Save Machine</button>
+      </div>
+    `).join('') : '<div class="empty-state">No machines purchased</div>';
+
+    const txHtml = d.transactions.length ? d.transactions.map(t => `
+      <div class="row-sub" style="padding:4px 0;border-bottom:1px solid var(--border)">
+        ${t.created_at} · <b style="color:${t.amount >= 0 ? '#44ee88' : '#ee4444'}">${t.amount >= 0 ? '+' : ''}${fmt(t.amount)}</b> · ${esc(t.type)} ${t.note ? '— ' + esc(t.note) : ''}
+      </div>
+    `).join('') : '<div class="empty-state">No transactions</div>';
+
+    const reassignHtml = (ME && ME.is_super) ? `
+      <div class="divider"></div>
+      <div class="sub-heading">Manager Assignment</div>
+      <div class="form-field">
+        <select id="reassign-manager">
+          <option value="">Unassigned</option>
+          ${Object.entries(managersById).map(([id, name]) =>
+            `<option value="${id}" ${String(u.assigned_manager_id) === String(id) ? 'selected' : ''}>${esc(name)}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="form-actions"><button class="btn-secondary" onclick="reassignUser(${u.id})">Reassign</button></div>
+    ` : '';
+
+    document.getElementById('user-overlay-body').innerHTML = `
+      <div style="text-align:center;margin-bottom:12px">
+        <img src="${avatarSrc(u.avatar_url)}" onerror="this.src='../assets/icon-512.png'"
+             style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--border-cyan)">
+      </div>
+      <div class="sub-heading">Edit Fields</div>
+      ${fieldsHtml}
+      <div class="form-actions">
+        <button class="btn-primary" onclick="saveUserFields(${u.id})">Save Changes</button>
+      </div>
+      ${reassignHtml}
+
+      <div class="divider"></div>
+      <div class="sub-heading">Adjust Balance</div>
+      <div class="mini-note">Goes through the ledger (recommended over editing Balance directly above)</div>
+      <div class="form-grid">
+        <div class="form-field"><label>Amount (+/-)</label><input id="adj-amount" placeholder="e.g. 5000 or -2000"></div>
+        <div class="form-field"><label>Note</label><input id="adj-note" placeholder="Reason"></div>
+      </div>
+      <div class="form-actions"><button class="btn-primary" onclick="adjustBalance(${u.id})">Apply Adjustment</button></div>
+
+      <div class="divider"></div>
+      <div class="sub-heading">Reset Password</div>
+      <div class="form-field"><input id="reset-pw" type="text" placeholder="New password"></div>
+      <div class="form-actions"><button class="btn-secondary" onclick="resetUserPassword(${u.id})">Reset Password</button></div>
+
+      <div class="divider"></div>
+      <div class="sub-heading">Machines (${d.machines.length})</div>
+      ${machinesHtml}
+
+      <div class="divider"></div>
+      <div class="sub-heading">Recent Transactions</div>
+      ${txHtml}
+
+      <div class="divider"></div>
+      <div class="form-actions"><button class="btn-danger" onclick="deleteUser(${u.id})">Delete User Permanently</button></div>
+    `;
+  };
+  window.reassignUser = async function (userId) {
+    const val = document.getElementById('reassign-manager').value;
+    const d = await api(`/api/admin/users/${userId}/reassign`, {
+      method: 'POST', body: JSON.stringify({ manager_id: val ? parseInt(val) : null }),
+    });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Reassigned'); loadUsers(); loadManagers();
+  };
+  document.getElementById('user-overlay-close').addEventListener('click', () => { closeOverlays(); loadUsers(); loadStats(); });
+
+  window.saveUserFields = async function (userId) {
+    const updates = {};
+    document.querySelectorAll('#user-overlay-body [data-field]').forEach(el => { updates[el.dataset.field] = el.value; });
+    const d = await api(`/api/admin/users/${userId}`, { method: 'PATCH', body: JSON.stringify(updates) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Save failed')); return; }
+    toast('✅ Saved'); loadStats();
+  };
+
+  window.saveUserMachine = async function (umId) {
+    const updates = {};
+    document.querySelectorAll(`[data-um-id="${umId}"]`).forEach(el => { updates[el.dataset.umField] = el.value; });
+    const d = await api(`/api/admin/user-machines/${umId}`, { method: 'PATCH', body: JSON.stringify(updates) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Save failed')); return; }
+    toast('✅ Machine updated');
+  };
+
+  window.adjustBalance = async function (userId) {
+    const amount = document.getElementById('adj-amount').value.trim();
+    const note = document.getElementById('adj-note').value.trim();
+    const d = await api(`/api/admin/users/${userId}/adjust-balance`, { method: 'POST', body: JSON.stringify({ amount, note }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Balance adjusted');
+    openUserDetail(userId); loadStats();
+  };
+
+  window.resetUserPassword = async function (userId) {
+    const new_password = document.getElementById('reset-pw').value;
+    const d = await api(`/api/admin/users/${userId}/reset-password`, { method: 'POST', body: JSON.stringify({ new_password }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Password reset — user logged out everywhere');
+    document.getElementById('reset-pw').value = '';
+  };
+
+  window.deleteUser = async function (userId) {
+    if (!confirm('Permanently delete this user and all their data? This cannot be undone.')) return;
+    const d = await api(`/api/admin/users/${userId}`, { method: 'DELETE' });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ User deleted');
+    closeOverlays(); loadUsers(); loadStats();
+  };
+
+  /* ══════════════════════ MACHINES ══════════════════════ */
+  let machinesOffset = 0;
+  const MACHINES_PAGE = 20;
+  async function loadMachines(more) {
+    if (!more) machinesOffset = 0;
+    const d = await api(`/api/admin/machines?limit=${MACHINES_PAGE}&offset=${machinesOffset}`);
+    const list = document.getElementById('machine-list');
+    const btn = document.getElementById('machines-load-more');
+    if (!d.ok) { list.innerHTML = '<div class="empty-state">Could not load machines</div>'; btn.style.display = 'none'; return; }
+    const html = d.machines.map(m => `
+      <div class="row-card">
+        <div class="row-top">
+          <span style="color:var(--cyan);font-weight:700">${esc(m.id)}</span>
+          <span class="status-pill ${m.sold ? 'pill-failed' : 'pill-successful'}">${m.sold ? 'Sold out' : 'In shop'}</span>
+        </div>
+        <div class="form-grid" style="margin-top:8px">
+          <div class="form-field"><label>Series</label><input data-mf="series" data-mid="${m.id}" value="${esc(m.series)}"></div>
+          <div class="form-field"><label>Price</label><input data-mf="price" data-mid="${m.id}" value="${m.price}"></div>
+          <div class="form-field"><label>Total Income</label><input data-mf="income" data-mid="${m.id}" value="${m.income}"></div>
+          <div class="form-field"><label>Lock Days</label><input data-mf="lock" data-mid="${m.id}" value="${m.lock}"></div>
+          <div class="form-field" style="grid-column:1/-1"><label>Image URL</label><input data-mf="image_url" data-mid="${m.id}" value="${esc(m.image_url || '')}"></div>
+          <div class="form-field">
+            <label>Sold Out</label>
+            <select data-mf="sold" data-mid="${m.id}">
+              <option value="0" ${!m.sold ? 'selected' : ''}>No — in shop</option>
+              <option value="1" ${m.sold ? 'selected' : ''}>Yes — retired</option>
+            </select>
+          </div>
+        </div>
+        <div class="row-actions">
+          <button class="act-btn act-neutral" onclick="saveMachine('${m.id}')">Save</button>
+          <button class="act-btn act-reject" onclick="deleteMachine('${m.id}')">Delete</button>
+        </div>
+      </div>
+    `).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No machines yet</div>'; }
+    machinesOffset += d.machines.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
+  }
+  window.saveMachine = async function (id) {
+    const updates = {};
+    document.querySelectorAll(`[data-mid="${id}"]`).forEach(el => { updates[el.dataset.mf] = el.value; });
+    const d = await api(`/api/admin/machines/${id}`, { method: 'PATCH', body: JSON.stringify(updates) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Save failed')); return; }
+    toast('✅ Machine saved'); loadMachines();
+  };
+  window.deleteMachine = async function (id) {
+    if (!confirm(`Delete machine "${id}"? This only works if no user owns one.`)) return;
+    const d = await api(`/api/admin/machines/${id}`, { method: 'DELETE' });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Deleted'); loadMachines();
+  };
+
+  window.openAddMachine = function () {
+    document.getElementById('form-overlay-title').textContent = 'Add Machine';
+    document.getElementById('form-overlay-body').innerHTML = `
+      <div class="form-field"><label>ID (e.g. "A4")</label><input id="nm-id"></div>
+      <div class="form-grid">
+        <div class="form-field"><label>Series</label><input id="nm-series" value="A"></div>
+        <div class="form-field"><label>Price</label><input id="nm-price"></div>
+        <div class="form-field"><label>Total Income</label><input id="nm-income"></div>
+        <div class="form-field"><label>Lock Days</label><input id="nm-lock" value="30"></div>
+      </div>
+      <div class="form-field"><label>Image URL</label><input id="nm-image"></div>
+      <div class="form-actions"><button class="btn-primary" onclick="submitAddMachine()">Create Machine</button></div>
+    `;
+    document.getElementById('form-overlay').classList.add('open');
+  };
+  window.submitAddMachine = async function () {
+    const body = {
+      id: document.getElementById('nm-id').value.trim(),
+      series: document.getElementById('nm-series').value.trim() || 'A',
+      price: document.getElementById('nm-price').value,
+      income: document.getElementById('nm-income').value,
+      lock: document.getElementById('nm-lock').value,
+      image_url: document.getElementById('nm-image').value.trim(),
+    };
+    const d = await api('/api/admin/machines', { method: 'POST', body: JSON.stringify(body) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Machine created'); closeOverlays(); loadMachines();
+  };
+
+  /* ══════════════════════ DEPOSITS ══════════════════════ */
+  let depositsOffset = 0;
+  const DEPOSITS_PAGE = 20;
+  async function loadDeposits(more) {
+    if (!more) depositsOffset = 0;
+    const d = await api(`/api/admin/deposits?limit=${DEPOSITS_PAGE}&offset=${depositsOffset}`);
+    const list = document.getElementById('deposit-list');
+    const btn = document.getElementById('deposits-load-more');
+    if (!d.ok) { list.innerHTML = '<div class="empty-state">Could not load deposits</div>'; btn.style.display = 'none'; return; }
+    const html = d.deposits.map(dep => `
+      <div class="row-card">
+        <div class="row-top">
+          <span class="row-amount">${fmt(dep.amount)}</span>
+          <span class="status-pill pill-${dep.status}">${dep.status}</span>
+        </div>
+        <div class="row-sub">${esc(dep.phone)} ${dep.nick ? '· ' + esc(dep.nick) : ''} · ${dep.network || ''}</div>
+        <div class="row-sub">${dep.created_at} · ref ${esc(dep.tx_ref)}</div>
+        <div class="row-actions">
+          <select data-dep-id="${dep.id}" style="flex:1;padding:8px;border-radius:8px;background:#041220;border:1px solid var(--border);color:#fff;font-size:12px">
+            <option value="pending" ${dep.status === 'pending' ? 'selected' : ''}>pending</option>
+            <option value="successful" ${dep.status === 'successful' ? 'selected' : ''}>successful</option>
+            <option value="failed" ${dep.status === 'failed' ? 'selected' : ''}>failed</option>
+          </select>
+          <button class="act-btn act-neutral" onclick="saveDepositStatus(${dep.id})">Update Status</button>
+        </div>
+      </div>
+    `).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No deposits yet</div>'; }
+    depositsOffset += d.deposits.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
+  }
+  window.saveDepositStatus = async function (id) {
+    const status = document.querySelector(`[data-dep-id="${id}"]`).value;
+    const d = await api(`/api/admin/deposits/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Status updated'); loadDeposits(); loadStats();
+  };
+
+  /* ══════════════════════ MANAGERS ══════════════════════ */
+  function avatarSrc(url) {
+    return url && url.trim() ? url : '../assets/icon-512.png';
+  }
+
+  async function loadManagers() {
+    const d = await api('/api/admin/admins');
+    const list = document.getElementById('manager-list');
+    if (!d.ok) {
+      list.innerHTML = `<div class="empty-state">${esc(d.error || 'Could not load managers')}</div>`;
+      return;
+    }
+    if (!d.admins.length) { list.innerHTML = '<div class="empty-state">No managers found</div>'; return; }
+    // Also wire up the group broadcast manager selector for super
+    _populateGroupManagerSelector(d.admins);
+    list.innerHTML = d.admins.map(a => `
+      <div class="row-card">
+        <div class="row-top">
+          <div style="display:flex;align-items:center;gap:8px">
+            <img class="avatar-thumb" src="${avatarSrc(a.avatar_url)}" onerror="this.src='../assets/icon-512.png'">
+            <span style="font-weight:700;color:#fff">${esc(a.name)} ${a.is_you ? '<span style="color:var(--cyan);font-size:11px">(you)</span>' : ''}</span>
+          </div>
+          <span class="status-pill ${a.role === 'super' ? 'pill-successful' : 'pill-pending'}">${a.role}</span>
+        </div>
+        <div class="row-sub">@${esc(a.username)} · ${a.batch_size} user${a.batch_size == 1 ? '' : 's'} in batch · added ${a.created_at}</div>
+        <div class="row-sub">Signup link: <code style="color:var(--cyan)">?mgr=${esc(a.manager_code)}</code></div>
+        ${a.role === 'manager' ? `
+          <div class="row-top" style="margin-top:8px">
+            <span class="row-sub" style="margin-top:0">View all members (not just own batch)</span>
+            <label class="toggle-switch">
+              <input type="checkbox" ${a.can_see_all ? 'checked' : ''} onchange="setManagerVisibility(${a.id}, this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        ` : ''}
+        <div class="row-actions">
+          <button class="act-btn act-neutral" onclick="copyManagerLink('${esc(a.manager_code)}')">Copy Signup Link</button>
+          <button class="act-btn act-neutral" onclick="filterUsersByManager(${a.id})">View Batch</button>
+          ${!a.is_you ? `<button class="act-btn act-reject" onclick="removeManager(${a.id})">Remove</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+  window.copyManagerLink = function (code) {
+    const link = `${window.location.origin}/index.html?mgr=${code}`;
+    navigator.clipboard.writeText(link).then(() => toast('Signup link copied!')).catch(() => toast(link));
+  };
+  window.filterUsersByManager = function (managerId) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelector('[data-tab="users"]').classList.add('active');
+    document.getElementById('panel-users').classList.add('active');
+    loadUsers('', managerId);
+  };
+  window.removeManager = async function (id) {
+    if (!confirm('Remove this manager account? Their entire batch is automatically reassigned to another manager (or to you) — nobody is left unassigned.')) return;
+    const d = await api(`/api/admin/admins/${id}`, { method: 'DELETE' });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Manager removed'); loadManagers();
+  };
+  window.setManagerVisibility = async function (id, canSeeAll) {
+    const d = await api(`/api/admin/admins/${id}/visibility`, { method: 'PATCH', body: JSON.stringify({ can_see_all: canSeeAll }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); loadManagers(); return; }
+    toast(canSeeAll ? '✅ Can now view all members' : '✅ Restricted to own batch');
+  };
+  window.bulkSetVisibility = async function (canSeeAll) {
+    if (!confirm(`${canSeeAll ? 'Enable' : 'Disable'} "View All Members" for every manager?`)) return;
+    const d = await api('/api/admin/admins/visibility/all', { method: 'PATCH', body: JSON.stringify({ can_see_all: canSeeAll }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Updated for all managers'); loadManagers();
+  };
+
+  window.openAddManager = function () {
+    document.getElementById('form-overlay-title').textContent = 'Add Manager';
+    document.getElementById('form-overlay-body').innerHTML = `
+      <div class="form-field"><label>Display Name</label><input id="am-name" placeholder="e.g. Sarah"></div>
+      <div class="form-field"><label>Username</label><input id="am-username"></div>
+      <div class="form-field"><label>Password</label><input id="am-password" type="text" placeholder="At least 8 characters"></div>
+      <div class="mini-note">A personal signup link is generated automatically — anyone who registers through it lands in this manager's batch. Anyone THEY invite inherits the same manager.</div>
+      <div class="form-actions"><button class="btn-primary" onclick="submitAddManager()">Create Manager</button></div>
+    `;
+    document.getElementById('form-overlay').classList.add('open');
+  };
+  window.submitAddManager = async function () {
+    const body = {
+      name: document.getElementById('am-name').value.trim(),
+      username: document.getElementById('am-username').value.trim(),
+      password: document.getElementById('am-password').value,
+    };
+    const d = await api('/api/admin/admins', { method: 'POST', body: JSON.stringify(body) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Manager created'); closeOverlays(); loadManagers();
+  };
+
+  /* ══════════════════════ ACTIVITY LOG ══════════════════════ */
+  let activityOffset = 0;
+  const ACTIVITY_PAGE = 50;
+  async function loadActivityLog(more) {
+    if (!more) activityOffset = 0;
+    const d = await api(`/api/admin/activity-log?limit=${ACTIVITY_PAGE}&offset=${activityOffset}`);
+    const list = document.getElementById('activity-list');
+    const btn = document.getElementById('activity-load-more');
+    if (!d.ok) { list.innerHTML = `<div class="empty-state">${esc(d.error || 'Could not load')}</div>`; btn.style.display = 'none'; return; }
+    const html = d.logs.map(l => `
+      <div class="row-card">
+        <div class="row-top"><span style="font-weight:700;color:#fff">${esc(l.name || l.username)}</span><span class="row-sub">${l.created_at}</span></div>
+        <div class="row-sub">${esc(l.action)}${l.detail ? ' — ' + esc(l.detail) : ''}</div>
+      </div>
+    `).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No activity yet</div>'; }
+    activityOffset += d.logs.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
+  }
+
+  /* ══════════════════════ MY PROFILE ══════════════════════ */
+  function loadProfileForm() {
+    if (!ME) return;
+    document.getElementById('profile-name').value = ME.name || '';
+    document.getElementById('profile-avatar-url').value = ME.avatar_url || '';
+    document.getElementById('profile-avatar-preview').src = avatarSrc(ME.avatar_url);
+  }
+  document.getElementById('profile-avatar-url').addEventListener('input', (e) => {
+    document.getElementById('profile-avatar-preview').src = avatarSrc(e.target.value.trim());
+  });
+  window.saveProfile = async function () {
+    const body = {
+      name: document.getElementById('profile-name').value.trim(),
+      avatar_url: document.getElementById('profile-avatar-url').value.trim(),
+    };
+    const d = await api('/api/admin/update-profile', { method: 'PATCH', body: JSON.stringify(body) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Profile saved');
+    ME.name = body.name; ME.avatar_url = body.avatar_url;
+  };
+
+  /* ══════════════════════ ANNOUNCEMENTS ══════════════════════ */
+  let announcementsOffset = 0;
+  const ANNOUNCEMENTS_PAGE = 20;
+  async function loadAnnouncements(more) {
+    if (!more) announcementsOffset = 0;
+    const d = await api(`/api/admin/announcements?limit=${ANNOUNCEMENTS_PAGE}&offset=${announcementsOffset}`);
+    const list = document.getElementById('announcement-list');
+    const btn = document.getElementById('announcements-load-more');
+    if (!d.ok) { list.innerHTML = '<div class="empty-state">Could not load announcements</div>'; btn.style.display = 'none'; return; }
+    const html = d.announcements.map(a => `
+      <div class="row-card">
+        <div class="form-field"><textarea data-ann-id="${a.id}" rows="2">${esc(a.text)}</textarea></div>
+        <div class="row-sub">Posted ${a.created_at}</div>
+        <div class="row-actions">
+          <button class="act-btn act-neutral" onclick="saveAnnouncement(${a.id})">Save</button>
+          <button class="act-btn act-reject" onclick="deleteAnnouncement(${a.id})">Delete</button>
+        </div>
+      </div>
+    `).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No announcements yet</div>'; }
+    announcementsOffset += d.announcements.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
+  }
+  window.saveAnnouncement = async function (id) {
+    const text = document.querySelector(`[data-ann-id="${id}"]`).value.trim();
+    const d = await api(`/api/admin/announcements/${id}`, { method: 'PATCH', body: JSON.stringify({ text }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Saved'); loadAnnouncements();
+  };
+  window.deleteAnnouncement = async function (id) {
+    if (!confirm('Delete this announcement?')) return;
+    const d = await api(`/api/admin/announcements/${id}`, { method: 'DELETE' });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Deleted'); loadAnnouncements();
+  };
+  window.openAddAnnouncement = function () {
+    document.getElementById('form-overlay-title').textContent = 'New Announcement';
+    document.getElementById('form-overlay-body').innerHTML = `
+      <div class="form-field"><label>Text</label><textarea id="na-text" rows="4"></textarea></div>
+      <div class="form-actions"><button class="btn-primary" onclick="submitAddAnnouncement()">Post</button></div>
+    `;
+    document.getElementById('form-overlay').classList.add('open');
+  };
+  window.submitAddAnnouncement = async function () {
+    const text = document.getElementById('na-text').value.trim();
+    const d = await api('/api/admin/announcements', { method: 'POST', body: JSON.stringify({ text }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Posted'); closeOverlays(); loadAnnouncements();
+  };
+
+  /* ══════════════════════ REWARD CODES ══════════════════════ */
+  function rewardCodeStatus(rc) {
+    const now = new Date();
+    if (!rc.active) return { label: 'disabled', cls: 'pill-failed' };
+    if (now < new Date(rc.valid_from)) return { label: 'upcoming', cls: 'pill-pending' };
+    if (now > new Date(rc.valid_until)) return { label: 'expired', cls: 'pill-expired' };
+    return { label: 'active', cls: 'pill-successful' };
+  }
+
+  let rewardsOffset = 0;
+  const REWARDS_PAGE = 20;
+  async function loadRewardCodes(more) {
+    if (!more) rewardsOffset = 0;
+    const d = await api(`/api/admin/reward-codes?limit=${REWARDS_PAGE}&offset=${rewardsOffset}`);
+    const list = document.getElementById('reward-code-list');
+    const btn = document.getElementById('rewards-load-more');
+    if (!d.ok) { list.innerHTML = '<div class="empty-state">Could not load reward codes</div>'; btn.style.display = 'none'; return; }
+    const html = d.reward_codes.map(rc => {
+      const st = rewardCodeStatus(rc);
+      return `
+        <div class="row-card">
+          <div class="row-top">
+            <span style="color:var(--cyan);font-weight:800;font-size:15px;letter-spacing:1px">${esc(rc.code)}</span>
+            <span class="status-pill ${st.cls}">${st.label}</span>
+          </div>
+          <div class="row-sub">Reward: <b style="color:#44ee88">${fmt(rc.amount)}</b> each · ${rc.redemption_count} redemption${rc.redemption_count == 1 ? '' : 's'}</div>
+          ${rc.description ? `<div class="row-sub">${esc(rc.description)}</div>` : ''}
+          <div class="row-sub">Valid ${rc.valid_from.replace('T', ' ')} → ${rc.valid_until.replace('T', ' ')}</div>
+          <div class="row-actions">
+            <button class="act-btn act-neutral" onclick="toggleRewardCode(${rc.id}, ${!rc.active})">${rc.active ? 'Disable' : 'Enable'}</button>
+            <button class="act-btn act-reject" onclick="deleteRewardCode(${rc.id})">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+    if (more) { list.insertAdjacentHTML('beforeend', html); } else { list.innerHTML = html || '<div class="empty-state">No reward codes yet</div>'; }
+    rewardsOffset += d.reward_codes.length;
+    btn.style.display = d.has_more ? 'block' : 'none';
+  }
+
+  window.toggleRewardCode = async function (id, newActive) {
+    const d = await api(`/api/admin/reward-codes/${id}`, { method: 'PATCH', body: JSON.stringify({ active: newActive }) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast(newActive ? '✅ Enabled' : '⏸️ Disabled'); loadRewardCodes();
+  };
+  window.deleteRewardCode = async function (id) {
+    if (!confirm('Delete this reward code? Past redemption history for it will also be removed.')) return;
+    const d = await api(`/api/admin/reward-codes/${id}`, { method: 'DELETE' });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast('✅ Deleted'); loadRewardCodes();
+  };
+
+  function defaultDateTimeLocal(offsetDays) {
+    const d = new Date(Date.now() + offsetDays * 86400000);
+    d.setSeconds(0, 0);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  }
+
+  window.openAddRewardCode = function () {
+    document.getElementById('form-overlay-title').textContent = 'Create Reward Code';
+    document.getElementById('form-overlay-body').innerHTML = `
+      <div class="form-field"><label>Code (leave blank to auto-generate)</label><input id="rc-code" style="text-transform:uppercase"></div>
+      <div class="form-field"><label>Reward Amount (per user)</label><input id="rc-amount"></div>
+      <div class="form-field"><label>Description (optional)</label><input id="rc-desc" placeholder="e.g. New Year Bonus"></div>
+      <div class="form-grid">
+        <div class="form-field"><label>Valid From</label><input id="rc-from" type="datetime-local" value="${defaultDateTimeLocal(0)}"></div>
+        <div class="form-field"><label>Valid Until</label><input id="rc-until" type="datetime-local" value="${defaultDateTimeLocal(7)}"></div>
+      </div>
+      <div class="mini-note">Any number of different users can redeem this code, each only once, only while it's within this window.</div>
+      <div class="form-actions"><button class="btn-primary" onclick="submitAddRewardCode()">Create Code</button></div>
+    `;
+    document.getElementById('form-overlay').classList.add('open');
+  };
+  window.submitAddRewardCode = async function () {
+    const body = {
+      code: document.getElementById('rc-code').value.trim(),
+      amount: document.getElementById('rc-amount').value,
+      description: document.getElementById('rc-desc').value.trim(),
+      valid_from: document.getElementById('rc-from').value,
+      valid_until: document.getElementById('rc-until').value,
+    };
+    const d = await api('/api/admin/reward-codes', { method: 'POST', body: JSON.stringify(body) });
+    if (!d.ok) { toast('❌ ' + (d.error || 'Failed')); return; }
+    toast(`✅ Code "${d.code}" created`); closeOverlays(); loadRewardCodes();
+  };
+
+  /* ══════════════════════ Overlay close wiring ══════════════════════ */
+  document.getElementById('form-overlay-close').addEventListener('click', closeOverlays);
+
+  // Light polling so new messages/withdrawals show up without a manual refresh.
+  setInterval(() => { loadStats(); loadConversations(); loadWithdrawals(); }, 10000);
+</script>
+</body>
+</html>

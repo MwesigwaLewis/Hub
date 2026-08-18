@@ -1,0 +1,161 @@
+import secrets
+import hashlib
+from flask import Blueprint, request, jsonify, make_response
+from werkzeug.security import generate_password_hash, check_password_hash
+from db.database import get_db
+
+auth_bp = Blueprint('auth', __name__, url_prefix='/api')
+
+SESSION_MAX_AGE = 60 * 60 * 24 * 30  # 30 days — matches the cookie's max_age
+
+def hash_password(pw):
+    """New passwords get a salted, slow hash instead of bare SHA-256."""
+    return generate_password_hash(pw)
+
+def verify_password(pw, stored_hash):
+    """
+    Accept either the new salted hash or a legacy unsalted-SHA256 hash left
+    over from before this fix, so existing accounts keep working.
+    """
+    if stored_hash.startswith(('scrypt:', 'pbkdf2:')):
+        return check_password_hash(stored_hash, pw)
+    return hashlib.sha256(pw.encode()).hexdigest() == stored_hash
+
+def generate_invite_code():
+    return secrets.token_hex(4).upper()
+
+def create_session(db, user_id):
+    token = secrets.token_hex(32)
+    db.execute("INSERT INTO sessions (token, user_id) VALUES (?,?)", (token, user_id))
+    return token
+
+# ── POST /api/register ────────────────────────────────────────────────────────
+@auth_bp.route('/register', methods=['POST'])
+def register():
+    data         = request.get_json() or {}
+    phone        = (data.get('phone') or '').strip()
+    password     = (data.get('password') or '').strip()
+    invite_code  = (data.get('invite_code') or '').strip().upper()
+    manager_code = (data.get('manager_code') or '').strip().upper()
+
+    if not phone or not password:
+        return jsonify({'ok': False, 'error': 'Phone and password are required'})
+
+    # Every new account must arrive via a valid code — either an existing
+    # member's invite code, or a manager's own direct signup link. No more
+    # organic/codeless registration and no round-robin fallback assignment.
+    if not invite_code and not manager_code:
+        return jsonify({'ok': False, 'error': 'An invitation code is required to register'})
+
+    db = get_db()
+    try:
+        existing = db.execute("SELECT id FROM users WHERE phone=?", (phone,)).fetchone()
+        if existing:
+            return jsonify({'ok': False, 'error': 'Phone already registered'})
+
+        invited_by = None
+        assigned_manager_id = None
+
+        if invite_code:
+            ref = db.execute(
+                "SELECT id, assigned_manager_id FROM users WHERE invite_code=?", (invite_code,)
+            ).fetchone()
+            if not ref:
+                return jsonify({'ok': False, 'error': 'Invalid invitation code'})
+            invited_by = ref['id']
+            # Rule: an invitee always gets the SAME manager as whoever
+            # invited them.
+            assigned_manager_id = ref['assigned_manager_id']
+
+        if assigned_manager_id is None:
+            # Either this was a manager's own direct signup link (no peer
+            # invite_code at all), or — in the unexpected case a referrer
+            # somehow has no manager — manager_code is the only other valid
+            # path. Either way, a valid manager_code is now required here;
+            # there is no longer a silent fallback to "assign someone".
+            if not manager_code:
+                return jsonify({'ok': False, 'error': 'Invalid invitation code'})
+            mgr = db.execute("SELECT id FROM admins WHERE manager_code=?", (manager_code,)).fetchone()
+            if not mgr:
+                return jsonify({'ok': False, 'error': 'Invalid invitation code'})
+            assigned_manager_id = mgr['id']
+
+        # The check above has a race: two identical registrations can both
+        # pass it before either INSERT commits. The UNIQUE constraint on
+        # phone is the real guard — if we lose that race, catch it here and
+        # return a clean error instead of an unhandled 500.
+        my_invite = generate_invite_code()
+        try:
+            db.execute(
+                """INSERT INTO users (phone, password, invite_code, invited_by, assigned_manager_id)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (phone, hash_password(password), my_invite, invited_by, assigned_manager_id)
+            )
+        except Exception:
+            db.rollback()
+            return jsonify({'ok': False, 'error': 'Phone already registered'})
+
+        if invited_by:
+            db.execute("UPDATE users SET invite_count=invite_count+1, team_count=team_count+1 WHERE id=?",
+                       (invited_by,))
+
+        db.commit()
+
+        user = db.execute("SELECT * FROM users WHERE phone=?", (phone,)).fetchone()
+        token = create_session(db, user['id'])
+        db.commit()
+
+        resp = make_response(jsonify({'ok': True}))
+        resp.set_cookie('session_token', token, httponly=True, samesite='Lax', max_age=SESSION_MAX_AGE)
+        return resp
+
+    finally:
+        db.close()
+
+# ── POST /api/login ───────────────────────────────────────────────────────────
+@auth_bp.route('/login', methods=['POST'])
+def login():
+    data     = request.get_json() or {}
+    phone    = (data.get('phone') or '').strip()
+    password = (data.get('password') or '').strip()
+
+    if not phone or not password:
+        return jsonify({'ok': False, 'error': 'Phone and password are required'})
+
+    db = get_db()
+    try:
+        user = db.execute("SELECT * FROM users WHERE phone=?", (phone,)).fetchone()
+        if not user or not verify_password(password, user['password']):
+            return jsonify({'ok': False, 'error': 'Invalid phone or password'})
+
+        # Transparently upgrade legacy sha256 hashes now that we know the
+        # plaintext password was correct.
+        if not user['password'].startswith(('scrypt:', 'pbkdf2:')):
+            db.execute("UPDATE users SET password=? WHERE id=?", (hash_password(password), user['id']))
+
+        # Drives the announcement-popup countdown (see /api/messages/popup) —
+        # deliberately only bumped here, on an actual sign-in, not on every
+        # page load of an already-authenticated session.
+        db.execute("UPDATE users SET login_count=login_count+1 WHERE id=?", (user['id'],))
+
+        token = create_session(db, user['id'])
+        db.commit()
+
+        resp = make_response(jsonify({'ok': True}))
+        resp.set_cookie('session_token', token, httponly=True, samesite='Lax', max_age=SESSION_MAX_AGE)
+        return resp
+    finally:
+        db.close()
+
+# ── POST /api/logout ──────────────────────────────────────────────────────────
+@auth_bp.route('/logout', methods=['POST'])
+def logout():
+    token = request.cookies.get('session_token')
+    if token:
+        db = get_db()
+        db.execute("DELETE FROM sessions WHERE token=?", (token,))
+        db.commit()
+        db.close()
+    resp = make_response(jsonify({'ok': True}))
+    resp.delete_cookie('session_token')
+    return resp

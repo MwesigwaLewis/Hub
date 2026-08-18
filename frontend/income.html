@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Future AI Hub — Income</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+
+    /* ── SUMMARY STRIP ── */
+    .summary-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; padding: 14px 12px 6px;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border-cyan);
+      border-radius: 10px; padding: 13px 12px;
+    }
+    .summary-lbl { font-size: 11px; color: var(--text-muted); margin-bottom: 5px; letter-spacing: 0.3px; }
+    .summary-val { font-size: 19px; font-weight: 700; color: var(--cyan); }
+    .summary-val.green { color: #44ee88; }
+
+    /* ── SECTION HEADING ── */
+    .section-head {
+      padding: 14px 12px 6px;
+      font-size: 11px; font-weight: 700;
+      color: var(--cyan); letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* ════════════════════════════════════════
+       MACHINE TILE  —  matches screenshot layout
+       Left half: full-bleed image
+       Right half: name + stats stacked
+    ════════════════════════════════════════ */
+    .mc-tile {
+      position: relative;
+      margin: 0 10px 12px;
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      height: 160px;
+      background: #040e18;
+      border: 1px solid #1a3a55;
+    }
+
+    /* ── Expired state: grey everything out ── */
+    .mc-tile.expired { filter: saturate(0.15) brightness(0.75); }
+
+    /* ── Left: machine image ── */
+    .mc-img {
+      width: 44%;
+      flex-shrink: 0;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* ── Right: info panel ── */
+    .mc-info {
+      flex: 1;
+      padding: 12px 12px 10px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-width: 0;
+    }
+
+    .mc-name {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--cyan);
+      letter-spacing: 0.3px;
+      margin-bottom: 2px;
+    }
+
+    .mc-row {
+      font-size: 13px;
+      color: #c8e4f8;
+      line-height: 1.7;
+    }
+    .mc-row span { color: #8aaabb; font-size: 12px; }
+
+    /* ── Progress bar (running machines only) ── */
+    .mc-progress {
+      margin-top: 6px;
+    }
+    .mc-progress-top {
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: #4a7a9a; margin-bottom: 3px;
+    }
+    .mc-track {
+      height: 4px; background: #0a1e2e; border-radius: 2px; overflow: hidden;
+    }
+    .mc-fill {
+      height: 100%; border-radius: 2px;
+      background: linear-gradient(90deg, var(--cyan), #44ee88);
+      transition: width 0.5s;
+    }
+
+    /* ── EXPIRE watermark — only on expired tiles ── */
+    .mc-expire-badge {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-15deg);
+      font-size: 52px;
+      font-weight: 900;
+      color: rgba(255,255,255,0.22);
+      letter-spacing: 2px;
+      pointer-events: none;
+      text-transform: uppercase;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    /* ── FILTER TABS ── */
+    .filter-row {
+      display: flex; gap: 8px; padding: 4px 12px 8px;
+      overflow-x: auto; scrollbar-width: none;
+    }
+    .filter-row::-webkit-scrollbar { display: none; }
+    .filter-chip {
+      padding: 5px 14px; border-radius: 20px; flex-shrink: 0;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      background: var(--surface2); color: var(--text-muted);
+      border: 1px solid var(--border); transition: all 0.15s;
+    }
+    .filter-chip.active { background: var(--cyan); color: #fff; border-color: var(--cyan); }
+
+    /* ── TRANSACTION ROW ── */
+    .tx-item {
+      margin: 0 10px 6px;
+      background: var(--surface);
+      border: 1px solid #0d2233;
+      border-radius: 8px; padding: 11px 13px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .tx-icon {
+      width: 34px; height: 34px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .tx-body { flex: 1; min-width: 0; }
+    .tx-type { font-size: 13px; font-weight: 600; color: #c8e4f4; text-transform: capitalize; }
+    .tx-note {
+      font-size: 11px; color: var(--text-muted); margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .tx-right { text-align: right; flex-shrink: 0; }
+    .tx-amount { font-size: 14px; font-weight: 700; }
+    .tx-date   { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .amount-pos { color: #44ee88; }
+    .amount-neg { color: #ee4444; }
+
+    /* ── MORE BUTTON ── */
+    .more-btn {
+      display: block; margin: 2px 10px 14px;
+      padding: 11px; text-align: center;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; font-size: 13px; font-weight: 600;
+      color: var(--cyan); cursor: pointer;
+    }
+    .more-btn:active { opacity: 0.7; }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="page">
+  <div class="app-bar">
+    <span class="app-bar-title">Income</span>
+  </div>
+
+  <div class="scroll-area">
+
+    <!-- ── SUMMARY CARDS ── -->
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="summary-lbl">AI Income</div>
+        <div class="summary-val" id="sum-ai">0.00</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-lbl">Today's Earnings</div>
+        <div class="summary-val green" id="sum-today">0.00</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-lbl">Team Income</div>
+        <div class="summary-val" id="sum-team">0.00</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-lbl">Total Deposited</div>
+        <div class="summary-val" id="sum-dep">0.00</div>
+      </div>
+    </div>
+
+    <!-- ── MY MACHINES ── -->
+    <div class="section-head">My Machines</div>
+    <div id="owned-list">
+      <div class="empty-state"><div class="empty-icon">🖥️</div>No machines purchased yet</div>
+    </div>
+    <div id="owned-more-btn"></div>
+
+    <!-- ── TRANSACTION HISTORY ── -->
+    
+  <nav class="bottom-nav" id="bottom-nav"></nav>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="assets/nav.js"></script>
+<script>
+  renderNav('income');
+  const fmt = n => Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  // ── MACHINES ────────────────────────────────────────────────────────────
+  const MACHINES_INITIAL = 4;
+  const MACHINES_STEP    = 4;
+  let allMachines = [];
+
+  function renderMachines(showCount) {
+    const box = document.getElementById('owned-list');
+
+    if (!allMachines.length) {
+      box.innerHTML = '<div class="empty-state"><div class="empty-icon">🖥️</div>No machines purchased yet</div>';
+      document.getElementById('owned-more-btn').innerHTML = '';
+      return;
+    }
+
+    const toShow = allMachines.slice(0, showCount);
+
+    box.innerHTML = toShow.map(m => {
+      const expired = m.status === 'expired';
+      const lock    = m.lock  || 0;
+      const earned  = m.earned || 0;
+      const total   = m.total_income || 0;
+      const pct     = total > 0 ? Math.min(100, (earned / total) * 100) : 0;
+
+      // Days elapsed / lock — derive from earned fraction when running
+      const daysElapsed = lock > 0 ? Math.round(pct / 100 * lock) : 0;
+
+      const img = m.image_url
+        ? m.image_url.startsWith('/')
+          ? m.image_url.slice(1)   // strip leading slash so it's relative
+          : m.image_url
+        : 'assets/images/A1_Machine.jpg';
+
+      return `
+        <div class="mc-tile${expired ? ' expired' : ''}">
+          <img class="mc-img" src="${img}" alt="${m.machine_id}"
+               onerror="this.src='assets/images/A1_Machine.jpg'">
+
+          <div class="mc-info">
+            <div class="mc-name">${m.machine_id}</div>
+
+            <div class="mc-row">
+              <span>Lock: </span>${daysElapsed}/${lock} Days
+            </div>
+            <div class="mc-row">
+              <span>Daily income: </span>${fmt(m.daily_income)}
+            </div>
+            <div class="mc-row">
+              <span>Income: </span>${fmt(total)}
+            </div>
+
+            ${!expired ? `
+            <div class="mc-progress">
+              <div class="mc-progress-top">
+                <span>Progress</span><span>${pct.toFixed(1)}%</span>
+              </div>
+              <div class="mc-track">
+                <div class="mc-fill" style="width:${pct}%"></div>
+              </div>
+            </div>` : ''}
+          </div>
+
+          ${expired ? '<div class="mc-expire-badge">Expire</div>' : ''}
+        </div>`;
+    }).join('');
+
+    // More button
+    const moreWrap = document.getElementById('owned-more-btn');
+    if (allMachines.length > showCount) {
+      const rem = allMachines.length - showCount;
+      moreWrap.innerHTML = `<div class="more-btn"
+        onclick="renderMachines(${showCount + MACHINES_STEP})">
+        Show More (${rem} remaining)
+      </div>`;
+    } else {
+      moreWrap.innerHTML = '';
+    }
+  }
+
+  // ── TRANSACTIONS ─────────────────────────────────────────────────────────
+  const TX_ICON = {
+    ai_income:        { icon: '🤖', bg: '#001a2e' },
+    deposit:          { icon: '⬇️', bg: '#001a0a' },
+    withdraw:         { icon: '⬆️', bg: '#1a0000' },
+    team:             { icon: '👥', bg: '#0a0020' },
+    withdraw_refund:  { icon: '↩️', bg: '#1a1000' },
+    admin_adjustment: { icon: '⚙️', bg: '#0d0d0d' },
+    purchase:         { icon: '🛒', bg: '#001428' },
+    salary:           { icon: '💼', bg: '#0a1a00' },
+  };
+
+  const TX_INITIAL = 10;
+  const TX_STEP    = 10;
+  let allTx      = [];
+  let filteredTx = [];
+  let shownTx    = TX_INITIAL;
+
+  function filterTx(type, el) {
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    filteredTx = type === 'all' ? allTx : allTx.filter(t => t.type === type);
+    shownTx = TX_INITIAL;
+    renderTx();
+  }
+
+  function renderTx() {
+    const list     = document.getElementById('tx-list');
+    const moreWrap = document.getElementById('tx-more-wrap');
+    if (!filteredTx.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">₿</div>No records for this filter</div>';
+      moreWrap.innerHTML = '';
+      return;
+    }
+    const toShow = filteredTx.slice(0, shownTx);
+    list.innerHTML = toShow.map(t => {
+      const pos   = parseFloat(t.amount) >= 0;
+      const meta  = TX_ICON[t.type] || { icon: '💰', bg: '#0a0a0a' };
+      const label = (t.type || '').replace(/_/g, ' ');
+      const date  = (t.created_at || '').split(' ')[0];
+      return `
+        <div class="tx-item">
+          <div class="tx-icon" style="background:${meta.bg}">${meta.icon}</div>
+          <div class="tx-body">
+            <div class="tx-type">${label}</div>
+            ${t.note ? `<div class="tx-note">${t.note}</div>` : ''}
+          </div>
+          <div class="tx-right">
+            <div class="tx-amount ${pos ? 'amount-pos' : 'amount-neg'}">${pos ? '+' : ''}${fmt(t.amount)}</div>
+            <div class="tx-date">${date}</div>
+          </div>
+        </div>`;
+    }).join('');
+
+    if (filteredTx.length > shownTx) {
+      moreWrap.innerHTML = `<div class="more-btn" onclick="loadMoreTx()">
+        Show More (${filteredTx.length - shownTx} remaining)
+      </div>`;
+    } else {
+      moreWrap.innerHTML = '';
+    }
+  }
+
+  function loadMoreTx() { shownTx += TX_STEP; renderTx(); }
+
+  // ── LOAD (single fetch) ──────────────────────────────────────────────────
+  async function loadAll() {
+    try {
+      const r = await fetch('/api/income-summary');
+      const d = await r.json();
+      if (!d.ok) return;
+
+      // Summary
+      const u = d.user;
+      document.getElementById('sum-ai').textContent    = fmt(u.ai_income);
+      document.getElementById('sum-today').textContent = fmt(u.today_earnings);
+      document.getElementById('sum-team').textContent  = fmt(u.team_income);
+      document.getElementById('sum-dep').textContent   = fmt(u.total_deposit);
+
+      // Machines — running first, then expired
+      if (d.machines) {
+        allMachines = [
+          ...d.machines.filter(m => m.status === 'running'),
+          ...d.machines.filter(m => m.status !== 'running'),
+        ];
+        renderMachines(MACHINES_INITIAL);
+      }
+
+      // Transactions
+      if (d.transactions) {
+        allTx      = d.transactions;
+        filteredTx = allTx;
+        renderTx();
+      }
+    } catch(e) {}
+  }
+
+  loadAll();
+</script>
+</body>
+  </html>

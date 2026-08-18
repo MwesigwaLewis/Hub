@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Future AI Hub — Raffle</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    .app-bar-title { text-align: center; flex: 1; font-size: 17px; font-weight: 700; }
+
+    .raffle-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 12px; padding: 16px;
+    }
+    .raffle-card {
+      aspect-ratio: 2 / 3;
+      background: linear-gradient(155deg, #1a0055 0%, #002666 45%, #0d0033 100%);
+      border: 2px solid #7744cc;
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 6px;
+      cursor: pointer;
+      box-shadow: 0 0 18px #8844ff22, inset 0 0 24px #0033aa18;
+      transition: transform 0.12s, box-shadow 0.12s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      position: relative; overflow: hidden;
+    }
+    .raffle-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 50% 30%, #8866ff18, transparent 70%);
+    }
+    .raffle-card:active { transform: scale(0.93); box-shadow: 0 0 30px #8844ff44; }
+
+    .card-ai-ring {
+      width: 54px; height: 54px;
+      border-radius: 50%;
+      border: 2px solid #6655ee;
+      display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle, #221166, #000033);
+      box-shadow: 0 0 14px #6644ee44, inset 0 0 10px #4433bb22;
+      position: relative; z-index: 1;
+    }
+    .card-ai-text {
+      font-size: 15px; font-weight: 800; color: #fff;
+      letter-spacing: 1px;
+      font-family: 'Rajdhani', sans-serif;
+    }
+    .card-circuit-lines {
+      position: absolute; inset: 0; opacity: 0.15;
+      background-image:
+        linear-gradient(90deg, #7744ff 1px, transparent 1px),
+        linear-gradient(0deg, #7744ff 1px, transparent 1px);
+      background-size: 18px 18px;
+      background-position: 0 0;
+    }
+
+    .raffle-ready-box {
+      margin: 0 14px 12px;
+      background: #0b111c;
+      border: 1px solid #1a2a3a;
+      border-radius: 8px;
+      padding: 15px;
+      text-align: center;
+      font-size: 16px; font-weight: 600;
+      color: #fff;
+    }
+
+    .raffle-records-box {
+      margin: 0 14px 14px;
+      background: #04131f;
+      border: 1px solid var(--border-cyan);
+      border-radius: 12px; padding: 14px;
+    }
+    .raffle-records-title {
+      color: var(--cyan); font-size: 16px; font-weight: 800;
+      text-align: center; margin-bottom: 14px; letter-spacing: 0.5px;
+    }
+    .raffle-rec {
+      display: flex; justify-content: space-between;
+      font-size: 13px; color: #7a9aaa;
+      padding: 8px 0;
+      border-bottom: 1px solid #ffffff08;
+    }
+    .raffle-rec:last-child { border-bottom: none; }
+    .prize-val { color: var(--cyan); font-weight: 600; }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="page">
+  <div class="app-bar">
+    <span style="width:40px"></span>
+    <span class="app-bar-title">Raffle</span>
+    <span style="width:40px"></span>
+  </div>
+
+  <div class="scroll-area">
+    <!-- 3×3 Card Grid -->
+    <div class="raffle-grid" id="raffle-grid"></div>
+
+    <!-- Ready counter -->
+    <div class="raffle-ready-box">
+      Ready: <span id="raffle-ready">0</span>
+    </div>
+
+    <!-- Records -->
+    <div class="raffle-records-box">
+      <div class="raffle-records-title">My records</div>
+      <div id="raffle-records">
+        <div class="empty-state"><div class="empty-icon">🎲</div>No raffle records yet</div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="bottom-nav" id="bottom-nav"></nav>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/nav.js"></script>
+<script>
+  renderNav('raffle');
+
+  function buildCards() {
+    const grid = document.getElementById('raffle-grid');
+    grid.innerHTML = '';
+    for (let i = 0; i < 9; i++) {
+      const card = document.createElement('div');
+      card.className = 'raffle-card';
+      card.innerHTML = `
+        <div class="card-circuit-lines"></div>
+        <div class="card-ai-ring">
+          <span class="card-ai-text">AI</span>
+        </div>
+      `;
+      card.addEventListener('click', doRaffle);
+      grid.appendChild(card);
+    }
+  }
+
+  async function doRaffle() {
+    try {
+      const r = await fetch('/api/raffle', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
+      const d = await r.json();
+      if (!d.ok) { toast('❌ ' + (d.error || 'Not enough tickets')); return; }
+      toast('🎉 You got: ' + d.prize + '!');
+      loadRecords();
+      loadReady();
+    } catch(e) { toast('❌ Connection error'); }
+  }
+
+  async function loadReady() {
+    try {
+      const r = await fetch('/api/me');
+      const d = await r.json();
+      if (d.ok) document.getElementById('raffle-ready').textContent = d.user.raffle_ready || 0;
+    } catch(e) {}
+  }
+
+  async function loadRecords() {
+    try {
+      const r = await fetch('/api/raffle/records');
+      const d = await r.json();
+      const box = document.getElementById('raffle-records');
+      if (!d.ok || !d.records.length) {
+        box.innerHTML = '<div class="empty-state"><div class="empty-icon">🎲</div>No raffle records yet</div>';
+        return;
+      }
+      box.innerHTML = d.records.map(rec => {
+        const ph = rec.user_phone;
+        const masked = ph.slice(0,3) + ' **** **** ' + ph.slice(-1);
+        const dt = (rec.created_at || '').split(' ')[0];
+        const parts = dt.split('-');
+        const display = parts.length === 3 ? parts[2]+'-'+parts[1]+'-'+parts[0] : dt;
+        return `<div class="raffle-rec">
+          <span>${masked}</span>
+          <span class="prize-val">${rec.prize}</span>
+          <span>${display}</span>
+        </div>`;
+      }).join('');
+    } catch(e) {}
+  }
+
+  buildCards();
+  loadReady();
+  loadRecords();
+</script>
+</body>
+</html>

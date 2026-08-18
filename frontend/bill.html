@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Future AI Hub — Bill</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    /* ── FILTER TABS ── */
+    .bill-filters {
+      display: flex; gap: 0;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto; scrollbar-width: none;
+      position: sticky; top: 50px; z-index: 30;
+    }
+    .bill-filters::-webkit-scrollbar { display: none; }
+    .bill-filter {
+      padding: 12px 16px;
+      font-size: 13px; font-weight: 600;
+      color: #3a5a7a; cursor: pointer;
+      white-space: nowrap; flex-shrink: 0;
+      border-bottom: 2.5px solid transparent;
+      transition: color 0.2s;
+    }
+    .bill-filter.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+
+    /* ── BILL ITEM ── */
+    .bill-item {
+      display: flex; align-items: center;
+      padding: 15px 16px;
+      border-bottom: 1px solid #060f18;
+      gap: 14px;
+      background: transparent;
+      transition: background 0.15s;
+    }
+    .bill-item:hover { background: #050d18; }
+    .bill-icon-wrap {
+      width: 42px; height: 42px; border-radius: 12px;
+      background: #041220;
+      border: 1px solid var(--border-cyan);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .bill-main { flex: 1; }
+    .bill-type { font-size: 14px; color: #c0d8e8; font-weight: 600; margin-bottom: 3px; }
+    .bill-date { font-size: 11px; color: #2a4a6a; }
+    .bill-note { font-size: 11px; color: #2a4a6a; margin-top: 1px; }
+    .bill-amount { font-size: 15px; font-weight: 700; white-space: nowrap; }
+    .bill-pos { color: #44ee88; }
+    .bill-neg { color: #ee4444; }
+    .bill-neutral { color: var(--cyan); }
+
+    /* ── SUMMARY STRIP ── */
+    .bill-summary {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; gap: 0;
+    }
+    .bill-sum-item { flex: 1; padding: 12px 8px; text-align: center; }
+    .bill-sum-item:not(:last-child) { border-right: 1px solid var(--border); }
+    .bill-sum-lbl { font-size: 10px; color: #3a5a7a; margin-bottom: 4px; letter-spacing: 0.3px; }
+    .bill-sum-val { font-size: 14px; font-weight: 700; color: #fff; }
+
+    /* ── DATE GROUP ── */
+    .date-group-label {
+      padding: 10px 16px 4px;
+      font-size: 11px; color: #2a4a6a;
+      font-weight: 600; letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="page">
+  <div class="app-bar">
+    <a href="settings.html" class="back-btn">‹</a>
+    <span class="app-bar-title">Bill</span>
+    <span style="width:40px"></span>
+  </div>
+
+  <!-- Summary strip -->
+  <div class="bill-summary">
+    <div class="bill-sum-item">
+      <div class="bill-sum-lbl">TOTAL IN</div>
+      <div class="bill-sum-val" id="sum-in" style="color:#44ee88">0.00</div>
+    </div>
+    <div class="bill-sum-item">
+      <div class="bill-sum-lbl">TOTAL OUT</div>
+      <div class="bill-sum-val" id="sum-out" style="color:#ee4444">0.00</div>
+    </div>
+    <div class="bill-sum-item">
+      <div class="bill-sum-lbl">NET</div>
+      <div class="bill-sum-val" id="sum-net">0.00</div>
+    </div>
+  </div>
+
+  <!-- Filter tabs -->
+  <div class="bill-filters" id="bill-filters">
+    <div class="bill-filter active" data-type="all" onclick="filterBill('all',this)">All</div>
+    <div class="bill-filter" data-type="deposit" onclick="filterBill('deposit',this)">Deposit</div>
+    <div class="bill-filter" data-type="withdraw" onclick="filterBill('withdraw',this)">Withdraw</div>
+    <div class="bill-filter" data-type="ai_income" onclick="filterBill('ai_income',this)">AI Income</div>
+    <div class="bill-filter" data-type="purchase" onclick="filterBill('purchase',this)">Purchase</div>
+    <div class="bill-filter" data-type="team" onclick="filterBill('team',this)">Team</div>
+    <div class="bill-filter" data-type="salary" onclick="filterBill('salary',this)">Salary</div>
+  </div>
+
+  <div class="scroll-area" style="padding-bottom:20px;" id="bill-list">
+    <div class="empty-state"><div class="empty-icon">📋</div>No bill records yet</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/nav.js"></script>
+<script>
+  const fmt = n => parseFloat(n||0).toFixed(2);
+  let allTx = [];
+
+  const TYPE_ICONS = {
+    deposit:    '💳',
+    withdraw:   '💸',
+    ai_income:  '🤖',
+    purchase:   '🖥️',
+    team:       '👥',
+    salary:     '💰',
+    raffle:     '🎲',
+  };
+  const TYPE_LABELS = {
+    deposit:    'Deposit',
+    withdraw:   'Withdraw',
+    ai_income:  'AI Income',
+    purchase:   'Machine Purchase',
+    team:       'Team Bonus',
+    salary:     'Salary',
+    raffle:     'Raffle Prize',
+  };
+
+  async function loadBill() {
+    try {
+      const r = await fetch('/api/transactions');
+      const d = await r.json();
+      if (d.ok) { allTx = d.transactions; renderBill('all'); updateSummary('all'); }
+    } catch(e) {}
+  }
+
+  function filterBill(type, el) {
+    document.querySelectorAll('.bill-filter').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    renderBill(type);
+    updateSummary(type);
+  }
+
+  function updateSummary(type) {
+    const items = type === 'all' ? allTx : allTx.filter(t => t.type === type);
+    let inAmt = 0, outAmt = 0;
+    items.forEach(t => {
+      const a = parseFloat(t.amount) || 0;
+      if (a >= 0) inAmt += a; else outAmt += Math.abs(a);
+    });
+    const net = inAmt - outAmt;
+    document.getElementById('sum-in').textContent  = fmt(inAmt);
+    document.getElementById('sum-out').textContent = fmt(outAmt);
+    const netEl = document.getElementById('sum-net');
+    netEl.textContent = (net >= 0 ? '+' : '') + fmt(net);
+    netEl.style.color = net >= 0 ? '#44ee88' : '#ee4444';
+  }
+
+  function renderBill(type) {
+    const list = document.getElementById('bill-list');
+    const items = type === 'all' ? allTx : allTx.filter(t => t.type === type);
+
+    if (!items.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div>No records for this filter</div>';
+      return;
+    }
+
+    // Group by date
+    const groups = {};
+    items.forEach(t => {
+      const dt = (t.created_at || '—').split(' ')[0];
+      if (!groups[dt]) groups[dt] = [];
+      groups[dt].push(t);
+    });
+
+    let html = '';
+    Object.keys(groups).sort((a,b) => b.localeCompare(a)).forEach(date => {
+      html += `<div class="date-group-label">${date}</div>`;
+      groups[date].forEach(t => {
+        const amt   = parseFloat(t.amount) || 0;
+        const cls   = amt > 0 ? 'bill-pos' : amt < 0 ? 'bill-neg' : 'bill-neutral';
+        const sign  = amt > 0 ? '+' : '';
+        const icon  = TYPE_ICONS[t.type] || '📄';
+        const label = TYPE_LABELS[t.type] || t.type;
+        html += `
+          <div class="bill-item">
+            <div class="bill-icon-wrap">${icon}</div>
+            <div class="bill-main">
+              <div class="bill-type">${label}</div>
+              ${t.machine_id ? `<div class="bill-note">Machine: ${t.machine_id}</div>` : ''}
+              ${t.note ? `<div class="bill-note">${t.note}</div>` : ''}
+              <div class="bill-date">${(t.created_at||'').split('.')[0]}</div>
+            </div>
+            <div class="bill-amount ${cls}">${sign}${fmt(amt)}</div>
+          </div>
+        `;
+      });
+    });
+    list.innerHTML = html;
+  }
+
+  loadBill();
+</script>
+</body>
+</html>

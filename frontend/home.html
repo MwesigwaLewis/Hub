@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Future AI Hub — Home</title>
+  <link rel="stylesheet" href="assets/shared.css">
+  <style>
+    /* ── HERO ── */
+    .hero-banner {
+      width: 100%; height: 200px;
+      background: linear-gradient(160deg, #04121e 0%, #051e30 50%, #021018 100%);
+      position: relative; overflow: hidden;
+      display: flex; align-items: flex-end;
+    }
+    .hero-img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%; object-fit: cover;
+      opacity: 0.55;
+    }
+    .hero-caption {
+      position: relative; z-index: 2;
+      padding: 8px 12px 10px;
+      font-size: 12.5px; font-weight: 600; color: var(--cyan);
+      line-height: 1.45;
+      background: linear-gradient(transparent, rgba(0,0,0,0.72));
+      width: 100%;
+    }
+
+    /* ── STATS 2×2 ── */
+    .stats-grid2 {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; padding: 12px 12px 0;
+    }
+    .stat-card {
+      background: #fff; border-radius: 8px;
+      overflow: hidden; text-align: center; padding: 14px 0px 0;
+    }
+    .stat-num { font-size: 17px; font-weight: 700; color: #000; padding-bottom: 10px; font-family: 'Exo 2', sans-serif; }
+    .stat-lbl {
+      background: var(--cyan); color: #fff;
+      font-size: 11px; padding: 5px 4px; font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    /* ── STATS 3 ── */
+    .stats-grid3 {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px; padding: 10px 12px 0;
+    }
+    .stat-card3 {
+      background: #fff; border-radius: 8px;
+      overflow: hidden; text-align: center; padding: 12px 0px 0;
+    }
+    .stat-num3 { font-size: 15px; font-weight: 700; color: #000; padding-bottom: 8px; font-family: 'Exo 2', sans-serif; }
+    .stat-lbl3 {
+      background: var(--cyan); color: #fff;
+      font-size: 10px; padding: 4px 2px; font-weight: 700;
+      letter-spacing: 0.1px;
+    }
+
+    /* ── MESSAGE PANEL ── */
+    .msg-panel {
+      margin: 12px;
+      background: #001d3311;
+      border: 2px solid var(--border-cyan);
+      border-radius: 12px; padding: 14px;
+    }
+    .msg-panel-hdr {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 16px; font-weight: 800; color: #fff; margin-bottom: 12px;
+    }
+    .msg-more { color: var(--cyan); font-size: 13px; cursor: pointer; font-weight: 600; }
+    .msg-item {
+      padding: 9px 0;
+      border-bottom: 1px solid #ffffff0a;
+      font-size: 13px; color: var(--cyan);
+      line-height: 1.4;
+    }
+    .msg-item:last-child { border-bottom: none; }
+    .msg-star { color: #ff3b3b; margin-right: 4px; }
+    .msg-item-red { color: #ff4444; }
+
+    /* ── ANNOUNCEMENT READ/UNREAD STATE ── */
+    .msg-row { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+    .msg-row-text { flex: 1; }
+    .msg-unread .msg-row-text { font-weight: 800; color: #eaf6ff; }
+    .msg-read .msg-row-text { font-weight: 400; color: #6a8aaa; }
+    .msg-unread-dot {
+      flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%;
+      background: #ff3b3b; margin-top: 5px;
+    }
+    .msg-time { display: block; font-size: 11px; color: #3a5a7a; margin-top: 2px; }
+
+    /* Little red dot on the bell icon when there's anything unread */
+    .app-bar-bell { position: relative; }
+    .bell-unread-dot {
+      position: absolute; top: -2px; right: 2px;
+      width: 9px; height: 9px; border-radius: 50%;
+      background: #ff3b3b; border: 1.5px solid #04121e; display: none;
+    }
+    .bell-unread-dot.show { display: block; }
+
+    /* ── ANNOUNCEMENT MODALS (reuses .modal-bg / .modal from shared.css) ── */
+    .modal-close-x {
+      position: absolute; top: 10px; right: 14px;
+      font-size: 22px; line-height: 1; color: #6a8aaa;
+      cursor: pointer; background: none; border: none; padding: 4px;
+    }
+    .modal-close-x:hover { color: #fff; }
+    #modal-announcement .modal { position: relative; }
+    #modal-inbox .modal { position: relative; max-height: 78vh; }
+    .inbox-list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; max-height: 60vh; }
+    .inbox-list .msg-item { padding: 11px 4px; }
+  </style>
+</head>
+<body>
+<div class="dot-bg"></div>
+
+<div class="page">
+  <!-- APP BAR -->
+  <div class="app-bar">
+    <span class="app-bar-title">Future AI Hub</span>
+    <div class="app-bar-bell" onclick="openInbox()">
+      <span class="bell-icon">🔔</span>
+      <span class="bell-unread-dot" id="bell-unread-dot"></span>
+      <span class="bell-label">Message</span>
+    </div>
+  </div>
+
+  <!-- SCROLL CONTENT -->
+  <div class="scroll-area">
+    <!-- Hero -->
+
+
+    
+<div class="hero-banner" id="hero-banner">
+  <img id="hero-img" class="hero-img" src="/assets/images/E1_Machine.jpg" alt="">
+  
+  <div class="hero-caption" id="hero-caption">
+    Hut 8's Strategic Bitcoin Reserve Surpasses $1 Billion in Market Value with Purchase of $100 Million of...
+  </div>
+
+  <!-- Navigation dots -->
+  <div class="hero-dots" id="hero-dots"></div>
+
+
+  
+  <!-- Optional arrow buttons (visible on tap) -->
+  <div class="hero-arrow hero-prev" id="hero-prev">‹</div>
+  <div class="hero-arrow hero-next" id="hero-next">›</div>
+</div>
+
+    <!-- Stats 2×2 -->
+    <div class="stats-grid2">
+      <div class="stat-card">
+        <div class="stat-num" id="h-deposit">—</div>
+        <div class="stat-lbl">Deposit details</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="h-withdraw">—</div>
+        <div class="stat-lbl">Withdraw details</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="h-ai-income">—</div>
+        <div class="stat-lbl">AI Income</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="h-today">—</div>
+        <div class="stat-lbl">Today's earnings</div>
+      </div>
+    </div>
+
+    <!-- Stats 3 -->
+    <div class="stats-grid3">
+      <div class="stat-card3" style="cursor:pointer" onclick="location.href='team.html'">
+        <div class="stat-num3" id="h-invite">—</div>
+        <div class="stat-lbl3">Invite Count</div>
+      </div>
+      <div class="stat-card3">
+        <div class="stat-num3" id="h-team">—</div>
+        <div class="stat-lbl3">Team Count</div>
+      </div>
+      <div class="stat-card3">
+        <div class="stat-num3" id="h-team-income">—</div>
+        <div class="stat-lbl3">Team income</div>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="msg-panel">
+      <div class="msg-panel-hdr">
+        <span>Message</span>
+        <span class="msg-more">More</span>
+      </div>
+      <div id="messages-list">
+        <div class="msg-item msg-item-red"><span class="msg-star">★</span>New member training</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav" id="bottom-nav"></nav>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Single announcement — auto-popup on login, or opened by tapping any item -->
+<div class="modal-bg" id="modal-announcement">
+  <div class="modal">
+    <button class="modal-close-x" onclick="closeAnnouncementModal()">×</button>
+    <div class="modal-title">📢 Announcement</div>
+    <p class="modal-sub" id="announcement-time"></p>
+    <p class="modal-sub" id="announcement-text" style="color:#eaf6ff; line-height:1.5; font-size:14px;"></p>
+  </div>
+</div>
+
+<!-- Full announcement history — opened via the bell icon -->
+<div class="modal-bg" id="modal-inbox">
+  <div class="modal">
+    <button class="modal-close-x" onclick="closeInbox()">×</button>
+    <div class="modal-title">📢 All Announcements</div>
+    <div class="inbox-list" id="inbox-list"></div>
+  </div>
+</div>
+
+<script src="assets/nav.js"></script>
+<script>
+  renderNav('home');
+
+  const fmt = n => parseFloat(n || 0).toFixed(2);
+
+  async function loadHome() {
+    try {
+      const r = await fetch('/api/me');
+      const d = await r.json();
+      if (!d.ok) { window.location.href = 'index.html'; return; }
+      const u = d.user;
+      document.getElementById('h-deposit').textContent    = fmt(u.total_deposit);
+      document.getElementById('h-withdraw').textContent   = fmt(u.total_withdraw);
+      document.getElementById('h-ai-income').textContent  = fmt(u.ai_income);
+      document.getElementById('h-today').textContent      = fmt(u.today_earnings);
+      document.getElementById('h-invite').textContent     = u.invite_count || 0;
+      document.getElementById('h-team').textContent       = u.team_count   || 0;
+      document.getElementById('h-team-income').textContent= fmt(u.team_income);
+    } catch(e) {
+      // Demo mode — leave placeholders
+    }
+  }
+
+  // ═══════ ANNOUNCEMENTS ═══════
+  let allMessages = [];  // cached list from /api/messages, shared by tile + inbox modal
+
+  function renderMessageRow(m) {
+    const unread = !m.read;
+    return `
+      <div class="msg-item ${unread ? 'msg-unread' : 'msg-read'}" onclick="openMessageModal(${m.id})">
+        <div class="msg-row">
+          ${unread ? '<span class="msg-unread-dot"></span>' : ''}
+          <div class="msg-row-text">
+            ${esc(m.text)}
+            <span class="msg-time">${m.created_at || ''}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s ?? '';
+    return d.innerHTML;
+  }
+
+  function renderMessagesUI() {
+    // Tile on the homepage — just the 5 most recent
+    const tile = document.getElementById('messages-list');
+    if (!allMessages.length) {
+      tile.innerHTML = '<div class="msg-item" style="color:#3a5a7a;">No announcements yet</div>';
+    } else {
+      tile.innerHTML = allMessages.slice(0, 5).map(renderMessageRow).join('');
+    }
+
+    // Bell badge — lit if anything anywhere is unread
+    const anyUnread = allMessages.some(m => !m.read);
+    document.getElementById('bell-unread-dot').classList.toggle('show', anyUnread);
+
+    // If the inbox modal happens to be open, keep it in sync too
+    if (document.getElementById('modal-inbox').classList.contains('open')) {
+      renderInboxList();
+    }
+  }
+
+  function renderInboxList() {
+    const list = document.getElementById('inbox-list');
+    list.innerHTML = allMessages.length
+      ? allMessages.map(renderMessageRow).join('')
+      : '<div class="empty-state">No announcements yet</div>';
+  }
+
+  async function loadMessages() {
+    try {
+      const r = await fetch('/api/messages');
+      const d = await r.json();
+      if (!d.ok) return;
+      allMessages = d.messages;
+      renderMessagesUI();
+    } catch (e) {}
+  }
+
+  function openInbox() {
+    renderInboxList();
+    document.getElementById('modal-inbox').classList.add('open');
+  }
+
+  function closeInbox() {
+    document.getElementById('modal-inbox').classList.remove('open');
+  }
+
+  async function openMessageModal(id) {
+    const m = allMessages.find(x => x.id === id);
+    if (!m) return;
+
+    document.getElementById('announcement-text').textContent = m.text;
+    document.getElementById('announcement-time').textContent = m.created_at || '';
+    document.getElementById('modal-announcement').classList.add('open');
+
+    if (!m.read) {
+      m.read = true;               // update locally right away — no flash of the old state
+      renderMessagesUI();
+      try {
+        await fetch(`/api/messages/${id}/read`, { method: 'POST' });
+      } catch (e) {}
+    }
+  }
+
+  function closeAnnouncementModal() {
+    document.getElementById('modal-announcement').classList.remove('open');
+  }
+
+  // Auto-popup: at most one, only the newest still-eligible announcement,
+  // and only ever up to 2 logins per announcement — all enforced server-side
+  // in /api/messages/popup. This call is what actually consumes one of
+  // those 2 allowances, so it's only made once here on page load.
+  async function checkAnnouncementPopup() {
+    try {
+      const r = await fetch('/api/messages/popup');
+      const d = await r.json();
+      if (d.ok && d.message) {
+        // Make sure it's present in the cached list (it should already be,
+        // since loadMessages() runs first — this is just a safety net)
+        // before opening the modal, which looks it up by id.
+        if (!allMessages.some(x => x.id === d.message.id)) {
+          allMessages.unshift({ ...d.message, read: false });
+        }
+        openMessageModal(d.message.id);
+      }
+    } catch (e) {}
+  }
+
+  loadHome();
+  loadMessages().then(checkAnnouncementPopup);
+</script>
+<script>
+const heroSlides = [
+  {
+    image: "/assets/images/E1_Machine.jpg",
+    caption: "Hut 8's Strategic Bitcoin Reserve Surpasses $1 Billion in Market Value with Purchase of $100 Million of..."
+  },
+  {
+    image: "/assets/images/E2_Machine.jpg",
+    caption: "New E-Series machines now available – Up to 2500% ROI in 120 days!"
+  },
+  {
+    image: "/assets/images/G1_Machine.jpg",
+    caption: "Join thousands earning daily with AI-powered mining machines"
+  },
+  {
+    image: "/assets/images/Z1_Machine.jpg",
+    caption: "Premium Z-Series: Highest returns for serious investors"
+  },
+  {
+    image: "/assets/images/VIP_1.jpg",
+    caption: "VIP Machines – Exclusive access for top performers"
+  }
+  // Add more slides here as needed
+];
+
+let currentIndex = 0;
+const heroImg = document.getElementById('hero-img');
+const heroCaption = document.getElementById('hero-caption');
+const heroDotsContainer = document.getElementById('hero-dots');
+
+// Render dots
+function renderDots() {
+  heroDotsContainer.innerHTML = heroSlides.map((_, i) => `
+    <div class="hero-dot \( {i === currentIndex ? 'active' : ''}" data-index=" \){i}"></div>
+  `).join('');
+  
+  // Click on dots
+  document.querySelectorAll('.hero-dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      currentIndex = parseInt(dot.dataset.index);
+      showSlide();
+    });
+  });
+}
+
+function showSlide() {
+  heroImg.style.opacity = '0';
+  
+  setTimeout(() => {
+    heroImg.src = heroSlides[currentIndex].image;
+    heroCaption.textContent = heroSlides[currentIndex].caption;
+    heroImg.style.opacity = '0.55';
+    renderDots();
+  }, 400);
+}
+
+// Auto rotate every 5 seconds
+let autoRotate = setInterval(() => {
+  currentIndex = (currentIndex + 1) % heroSlides.length;
+  showSlide();
+}, 5000);
+
+// Swipe support
+let touchStartX = 0;
+const heroBanner = document.getElementById('hero-banner');
+
+heroBanner.addEventListener('touchstart', e => {
+  touchStartX = e.changedTouches[0].screenX;
+  clearInterval(autoRotate); // Pause auto-rotate while user is swiping
+});
+
+heroBanner.addEventListener('touchend', e => {
+  const touchEndX = e.changedTouches[0].screenX;
+  const diff = touchStartX - touchEndX;
+
+  if (diff > 50) { // Swipe left → next
+    currentIndex = (currentIndex + 1) % heroSlides.length;
+    showSlide();
+  } else if (diff < -50) { // Swipe right → previous
+    currentIndex = (currentIndex - 1 + heroSlides.length) % heroSlides.length;
+    showSlide();
+  }
+  
+  // Resume auto-rotate
+  autoRotate = setInterval(() => {
+    currentIndex = (currentIndex + 1) % heroSlides.length;
+    showSlide();
+  }, 5000);
+});
+
+// Arrow buttons
+document.getElementById('hero-prev').addEventListener('click', () => {
+  currentIndex = (currentIndex - 1 + heroSlides.length) % heroSlides.length;
+  showSlide();
+});
+
+document.getElementById('hero-next').addEventListener('click', () => {
+  currentIndex = (currentIndex + 1) % heroSlides.length;
+  showSlide();
+});
+
+// Initialize
+renderDots();
+</script>
+
+  
+</body>
+        </html>
+
+          

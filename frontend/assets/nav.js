@@ -1,0 +1,739 @@
+/* ════════════════════════════════════════
+   FUTURE AI HUB — NAV ICONS
+   (Lucide for most, Font Awesome for specific ones)
+   HOW TO SWITCH AN ICON TO FONT AWESOME:
+   Just replace the value with a Font Awesome class string.
+   Examples: 'fa-solid fa-comment', 'fa-regular fa-bell', 'fa-brands fa-discord'
+   Anything NOT starting with 'fa-' stays as Lucide.
+════════════════════════════════════════ */
+
+const NAV_ICONS = {
+  home:   'fa-solid fa-database',       
+  raffle: 'cog',            
+  chat:   'fa-solid fa-comments',
+  ai:     'microchip',            
+  income: 'badge-dollar-sign',      
+  my:     'user',                 
+};
+
+// Some pages (currently my.html) already load Lucide themselves; for
+// everywhere else, load it once here so the nav icons render everywhere.
+function ensureLucide(cb) {
+  if (window.lucide) { cb(); return; }
+  const existing = document.querySelector('script[src*="lucide"]');
+  if (existing) { existing.addEventListener('load', cb); return; }
+  const script = document.createElement('script');
+  script.src = 'https://unpkg.com/lucide@latest/dist/umd/lucide.js';
+  script.onload = cb;
+  document.head.appendChild(script);
+}
+
+// Load Font Awesome CDN only when needed
+function ensureFontAwesome(cb) {
+  if (window.FontAwesome) { cb && cb(); return; }
+  const existing = document.querySelector('script[src*="fontawesome"]');
+  if (existing) { cb && existing.addEventListener('load', cb); return; }
+  const script = document.createElement('script');
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js';
+  script.crossOrigin = 'anonymous';
+  script.onload = () => cb && cb();
+  document.head.appendChild(script);
+}
+
+function renderNav(activePage) {
+  const pages = [
+    { id: 'home',   label: 'Home',   href: 'home.html' },
+    { id: 'raffle', label: 'Raffle', href: 'raffle.html' },
+    { id: 'chat',   label: 'Chat',   href: 'chat-select.html' },
+    { id: 'ai',     label: 'AI',     href: 'ai.html' },
+    { id: 'income', label: 'Income', href: 'income.html' },
+    { id: 'my',     label: 'My',     href: 'my.html' },
+  ];
+  const nav = document.getElementById('bottom-nav');
+  if (!nav) return;
+
+  nav.innerHTML = pages.map(p => {
+    const iconName = NAV_ICONS[p.id];
+    const isFa = iconName.startsWith('fa-');
+    const iconHtml = isFa
+      ? `<i class="${iconName}"></i>`
+      : `<i data-lucide="${iconName}"></i>`;
+
+    // Chat icon gets a badge wrapper so we can show unread count
+    const iconWrap = p.id === 'chat'
+      ? `<div class="nav-icon" style="position:relative">${iconHtml}<span class="chat-badge" id="nav-chat-badge" style="display:none;position:absolute;top:-4px;right:-6px;background:#e83a3a;color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:none;align-items:center;justify-content:center;padding:0 3px;line-height:16px;"></span></div>`
+      : `<div class="nav-icon">${iconHtml}</div>`;
+
+    return `
+      <a href="${p.href}" class="nav-item${p.id === activePage ? ' active' : ''}">
+        ${iconWrap}
+        <span>${p.label}</span>
+      </a>
+    `;
+  }).join('');
+
+  // Load Font Awesome only if any nav icon uses it
+  const needsFa = pages.some(p => NAV_ICONS[p.id].startsWith('fa-'));
+  if (needsFa) ensureFontAwesome();
+
+  // Always load Lucide for the remaining icons
+  ensureLucide(() => window.lucide.createIcons());
+
+  // Poll unread count and light up the badge
+  _startChatBadgePoll();
+}
+
+let _chatBadgePollTimer = null;
+function _startChatBadgePoll() {
+  if (_chatBadgePollTimer) return; // already running
+  async function _poll() {
+    try {
+      const r = await fetch('/api/chat/unread-count');
+      if (!r.ok) return;
+      const d = await r.json();
+      const total = (d.unread || 0) + (d.group_unread || 0);
+      const badge = document.getElementById('nav-chat-badge');
+      if (!badge) return;
+      if (total > 0) {
+        badge.textContent = total > 99 ? '99+' : total;
+        badge.style.display = 'flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    } catch(_) {}
+  }
+  _poll();
+  _chatBadgePollTimer = setInterval(_poll, 60000); // 60s — badge doesn't need to be real-time
+}
+
+function toast(msg) {
+  let el = document.getElementById('toast');
+  if (!el) { el = document.createElement('div'); el.id = 'toast'; el.className = 'toast'; document.body.appendChild(el); }
+  el.textContent = msg;
+  el.className = 'toast show';
+  setTimeout(() => { el.className = 'toast'; }, 2900);
+}
+
+/* ── WebGL dot-wave field (ported 1:1 from the reference ShaderProgram) ── */
+class ShaderProgram {
+  constructor( holder, options = {} ) {
+    options = Object.assign( {
+      antialias: false,
+      depthTest: false,
+      mousemove: false,
+      autosize: true,
+      side: 'front',
+      vertex: `
+        precision highp float;
+
+        attribute vec4 a_position;
+        attribute vec4 a_color;
+
+        uniform float u_time;
+        uniform vec2 u_resolution;
+        uniform vec2 u_mousemove;
+        uniform mat4 u_projection;
+
+        varying vec4 v_color;
+
+        void main() {
+
+          gl_Position = u_projection * a_position;
+          gl_PointSize = (10.0 / gl_Position.w) * 100.0;
+
+          v_color = a_color;
+
+        }`,
+      fragment: `
+        precision highp float;
+
+        uniform sampler2D u_texture;
+        uniform int u_hasTexture;
+
+        varying vec4 v_color;
+
+        void main() {
+
+          if ( u_hasTexture == 1 ) {
+
+            gl_FragColor = v_color * texture2D(u_texture, gl_PointCoord);
+
+          } else {
+
+            gl_FragColor = v_color;
+
+          }
+
+        }`,
+      uniforms: {},
+      buffers: {},
+      camera: {},
+      texture: null,
+      onUpdate: ( () => {} ),
+      onResize: ( () => {} ),
+    }, options )
+
+    const uniforms = Object.assign( {
+      time: { type: 'float', value: 0 },
+      hasTexture: { type: 'int', value: 0 },
+      resolution: { type: 'vec2', value: [ 0, 0 ] },
+      mousemove: { type: 'vec2', value: [ 0, 0 ] },
+      projection: { type: 'mat4', value: [ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 ] },
+    }, options.uniforms )
+
+    const buffers = Object.assign( {
+      position: { size: 3, data: [] },
+      color: { size: 4, data: [] },
+    }, options.buffers )
+
+    const camera = Object.assign( {
+      fov: 60,
+      near: 1,
+      far: 10000,
+      aspect: 1,
+      z: 100,
+      perspective: true,
+    }, options.camera )
+
+    const canvas = document.createElement( 'canvas' )
+    const gl = canvas.getContext( 'webgl', { antialias: options.antialias } )
+    if ( ! gl ) return false
+    this.count = 0
+    this.gl = gl
+    this.canvas = canvas
+    this.camera = camera
+    this.holder = holder
+    this.onUpdate = options.onUpdate
+    this.onResize = options.onResize
+    this.data = {}
+    holder.appendChild( canvas )
+    this.createProgram( options.vertex, options.fragment )
+    this.createBuffers( buffers )
+    this.createUniforms( uniforms )
+    this.updateBuffers()
+    this.updateUniforms()
+    this.createTexture( options.texture )
+
+    gl.enable( gl.BLEND )
+    gl.enable( gl.CULL_FACE )
+    gl.blendFunc( gl.SRC_ALPHA, gl.ONE )
+    gl[ options.depthTest ? 'enable' : 'disable' ]( gl.DEPTH_TEST )
+
+    if ( options.autosize )
+      window.addEventListener( 'resize', e => this.resize( e ), false )
+    if ( options.mousemove )
+      window.addEventListener( 'mousemove', e => this.mousemove( e ), false )
+    this.resize()
+    this.update = this.update.bind( this )
+    this.time = { start: performance.now(), old: performance.now() }
+    this.update()
+  }
+
+  mousemove( e ) {
+    let x = e.pageX / this.width * 2 - 1
+    let y = e.pageY / this.height * 2 - 1
+    this.uniforms.mousemove = [ x, y ]
+  }
+
+  resize( e ) {
+    const holder = this.holder
+    const canvas = this.canvas
+    const gl = this.gl
+    const width = this.width = holder.offsetWidth
+    const height = this.height = holder.offsetHeight
+    const aspect = this.aspect = width / height
+    const dpi = this.dpi = devicePixelRatio
+    canvas.width = width * dpi
+    canvas.height = height * dpi
+    canvas.style.width = width + 'px'
+    canvas.style.height = height + 'px'
+    gl.viewport( 0, 0, width * dpi, height * dpi * 1.3 )
+    gl.clearColor( 0, 0, 0, 0 )
+    this.uniforms.resolution = [ width, height ]
+    this.uniforms.projection = this.setProjection( aspect )
+    this.onResize( width, height, dpi )
+  }
+
+  setProjection( aspect ) {
+    const camera = this.camera
+    if ( camera.perspective ) {
+      camera.aspect = aspect
+      const fovRad = camera.fov * ( Math.PI / 180 )
+      const f = Math.tan( Math.PI * 0.5 - 0.5 * fovRad )
+      const rangeInv = 1.0 / ( camera.near - camera.far )
+
+      const matrix = [
+        f / camera.aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, (camera.near + camera.far) * rangeInv, -1,
+        0, 0, camera.near * camera.far * rangeInv * 2, 0
+      ]
+
+      matrix[ 14 ] += camera.z
+      matrix[ 15 ] += camera.z
+
+      return matrix
+
+    } else {
+
+      return [
+         2 / this.width, 0, 0, 0,
+         0, -2 / this.height, 0, 0,
+         0, 0, 1, 0,
+        -1, 1, 0, 1,
+      ]
+
+    }
+
+  }
+
+  createShader( type, source ) {
+
+    const gl = this.gl
+    const shader = gl.createShader( type )
+
+    gl.shaderSource( shader, source )
+    gl.compileShader( shader )
+
+    if ( gl.getShaderParameter (shader, gl.COMPILE_STATUS ) ) {
+
+      return shader
+
+    } else {
+
+      console.log( gl.getShaderInfoLog( shader ) )
+      gl.deleteShader( shader )
+
+    }
+
+  }
+
+  createProgram( vertex, fragment ) {
+
+    const gl = this.gl
+
+    const vertexShader = this.createShader( gl.VERTEX_SHADER, vertex )
+    const fragmentShader = this.createShader( gl.FRAGMENT_SHADER, fragment )
+
+    const program = gl.createProgram()
+
+    gl.attachShader( program, vertexShader )
+    gl.attachShader( program, fragmentShader )
+    gl.linkProgram( program )
+
+    if ( gl.getProgramParameter( program, gl.LINK_STATUS ) ) {
+
+      gl.useProgram( program )
+      this.program = program
+
+    } else {
+
+      console.log( gl.getProgramInfoLog( program ) )
+      gl.deleteProgram( program )
+
+    }
+
+  }
+
+  createUniforms( data ) {
+
+    const gl = this.gl
+    const uniforms = this.data.uniforms = data
+    const values = this.uniforms = {}
+
+    Object.keys( uniforms ).forEach( name => {
+
+      const uniform = uniforms[ name ]
+
+      uniform.location = gl.getUniformLocation( this.program, 'u_' + name )
+
+      Object.defineProperty( values, name, {
+        set: value => {
+
+          uniforms[ name ].value = value
+          this.setUniform( name, value )
+
+        },
+        get: () => uniforms[ name ].value
+      } )
+
+    } )
+
+  }
+
+  setUniform( name, value ) {
+
+    const gl = this.gl
+    const uniform = this.data.uniforms[ name ]
+
+    uniform.value = value
+
+    switch ( uniform.type ) {
+      case 'int': {
+        gl.uniform1i( uniform.location, value )
+        break
+      }
+      case 'float': {
+        gl.uniform1f( uniform.location, value )
+        break
+      }
+      case 'vec2': {
+        gl.uniform2f( uniform.location, ...value )
+        break
+      }
+      case 'vec3': {
+        gl.uniform3f( uniform.location, ...value )
+        break
+      }
+      case 'vec4': {
+        gl.uniform4f( uniform.location, ...value )
+        break
+      }
+      case 'mat2': {
+        gl.uniformMatrix2fv( uniform.location, false, value )
+        break
+      }
+      case 'mat3': {
+        gl.uniformMatrix3fv( uniform.location, false, value )
+        break
+      }
+      case 'mat4': {
+        gl.uniformMatrix4fv( uniform.location, false, value )
+        break
+      }
+    }
+
+  }
+
+  updateUniforms() {
+
+    const gl = this.gl
+    const uniforms = this.data.uniforms
+
+    Object.keys( uniforms ).forEach( name => {
+
+      const uniform = uniforms[ name ]
+
+      this.uniforms[ name ] = uniform.value
+
+    } )
+
+  }
+
+  createBuffers( data ) {
+
+    const gl = this.gl
+    const buffers = this.data.buffers = data
+    const values = this.buffers = {}
+
+    Object.keys( buffers ).forEach( name => {
+
+      const buffer = buffers[ name ]
+
+      buffer.buffer = this.createBuffer( 'a_' + name, buffer.size )
+
+      Object.defineProperty( values, name, {
+        set: data => {
+
+          buffers[ name ].data = data
+          this.setBuffer( name, data )
+
+          if ( name == 'position' )
+            this.count = buffers.position.data.length / 3
+
+        },
+        get: () => buffers[ name ].data
+      } )
+
+    } )
+
+  }
+
+  createBuffer( name, size ) {
+
+    const gl = this.gl
+    const program = this.program
+
+    const index = gl.getAttribLocation( program, name )
+    const buffer = gl.createBuffer()
+
+    gl.bindBuffer( gl.ARRAY_BUFFER, buffer )
+    gl.enableVertexAttribArray( index )
+    gl.vertexAttribPointer( index, size, gl.FLOAT, false, 0, 0 )
+
+    return buffer
+
+  }
+
+  setBuffer( name, data ) {
+
+    const gl = this.gl
+    const buffers = this.data.buffers
+
+    if ( name == null && ! gl.bindBuffer( gl.ARRAY_BUFFER, null ) ) return
+
+    gl.bindBuffer( gl.ARRAY_BUFFER, buffers[ name ].buffer )
+    gl.bufferData( gl.ARRAY_BUFFER, new Float32Array( data ), gl.STATIC_DRAW )
+
+  }
+
+  updateBuffers() {
+
+    const gl = this.gl
+    const buffers = this.buffers
+
+    Object.keys( buffers ).forEach( name =>
+      buffers[ name ] = buffer.data
+    )
+
+    this.setBuffer( null )
+
+  }
+
+  createTexture( src ) {
+
+    const gl = this.gl
+    const texture = gl.createTexture()
+
+    gl.bindTexture( gl.TEXTURE_2D, texture )
+    gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array( [ 0, 0, 0, 0 ] ) )
+
+    this.texture = texture
+
+    if ( src ) {
+
+      this.uniforms.hasTexture = 1
+      this.loadTexture( src )
+
+    }
+
+  }
+
+  loadTexture( src ) {
+
+    const gl = this.gl
+    const texture = this.texture
+
+    const textureImage = new Image()
+
+    textureImage.onload = () => {
+
+      gl.bindTexture( gl.TEXTURE_2D, texture )
+
+      gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textureImage )
+
+      gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR )
+      gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR )
+
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+
+    }
+
+    textureImage.src = src
+
+  }
+
+  update() {
+
+    const gl = this.gl
+
+    const now = performance.now()
+    const elapsed = ( now - this.time.start ) / 5000
+    const delta = now - this.time.old
+    this.time.old = now
+
+    this.uniforms.time = elapsed
+
+    if ( this.count > 0 ) {
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+
+      gl.drawArrays( gl.POINTS, 0, this.count )
+    }
+
+    this.onUpdate( delta )
+
+    requestAnimationFrame( this.update )
+
+  }
+
+}
+
+function initWaveBg() {
+  const bg = document.querySelector('.dot-bg');
+  if (!bg) return;
+
+  const pointSize = 2.5
+
+  new ShaderProgram( bg, {
+    texture: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAb1BMVEUAAAD///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8v0wLRAAAAJHRSTlMAC/goGvDhmwcExrVjWzrm29TRqqSKenRXVklANSIUE8mRkGpv+HOfAAABCElEQVQ4y4VT13LDMAwLrUHteO+R9f/fWMfO6dLaPeKVEECRxOULWsEGpS9nULDwia2Y+ALqUNbAWeg775zv+sA4/FFRMxt8U2FZFCVWjR/YrH4/H9sarclSKdPMWKzb8VsEeHB3m0shkhVCyNzeXeAQ9Xl4opEieX2QCGnwGbj6GMyjw9t1K0fK9YZunPXeAGsfJtYjwzxaBnozGGorYz0ypK2HzQSYx1y8DgSRo2ewOiyh2QWOEk1Y9OrQV0a8TiBM1a8eMHWYnRMy7CZ4t1CmyRkhSUvP3gRXyHOCLBxNoC3IJv//ZrJ/kxxUHPUB+6jJZZHrpg6GOjnqaOmzp4NDR48OLxn/H27SRQ08S0ZJAAAAAElFTkSuQmCC',
+    uniforms: {
+      size: { type: 'float', value: pointSize },
+      field: { type: 'vec3', value: [ 0, 0, 0 ] },
+      speed: { type: 'float', value: 5 },
+    },
+    vertex: `
+      #define M_PI 3.1415926535897932384626433832795
+
+      precision highp float;
+
+      attribute vec4 a_position;
+      attribute vec4 a_color;
+
+      uniform float u_time;
+      uniform float u_size;
+      uniform float u_speed;
+      uniform vec3 u_field;
+      uniform mat4 u_projection;
+
+      varying vec4 v_color;
+
+      void main() {
+
+        vec3 pos = a_position.xyz;
+
+        pos.y += (
+          cos(pos.x / u_field.x * M_PI * 8.0 + u_time * u_speed) +
+          sin(pos.z / u_field.z * M_PI * 8.0 + u_time * u_speed)
+        ) * u_field.y;
+
+        gl_Position = u_projection * vec4( pos.xyz, a_position.w );
+        gl_PointSize = ( u_size / gl_Position.w ) * 100.0;
+
+        v_color = a_color;
+
+      }`,
+    fragment: `
+      precision highp float;
+
+      uniform sampler2D u_texture;
+
+      varying vec4 v_color;
+
+      void main() {
+
+        gl_FragColor = v_color * texture2D(u_texture, gl_PointCoord);
+
+      }`,
+    onResize( w, h, dpi ) {
+
+      const position = [], color = []
+
+      const width = 400 * ( w / h )
+      const depth = 400
+      const height = 3
+      const distance = 4
+
+      for ( let x = 0; x < width; x += distance ) {
+        for ( let z = 0; z < depth; z+= distance ) {
+
+          position.push( - width / 2 + x, -30, -depth / 2 + z )
+
+          color.push( 0, 1 - ( x / width ) * 1, 0.5 + x / width * 0.5, z / depth );
+
+        }
+      }
+
+      this.uniforms.field = [ width, height, depth ]
+
+      this.buffers.position = position
+      this.buffers.color = color
+
+      this.uniforms.size = ( h / 400) * pointSize * dpi
+
+    },
+  } )
+}
+
+initWaveBg();
+
+/* ════════════════════════════════════════
+   PWA INSTALL / "DOWNLOAD APP"
+   Real .apk compilation needs an Android SDK + signing toolchain that
+   doesn't exist in a plain web stack, so "Download App" installs Future AI
+   Hub as a Progressive Web App instead — same icon-on-homescreen, full-screen,
+   offline-capable result a TWA-wrapped APK would give you, with no app store
+   review and no APK to host. See PWA_TO_APK.md if you specifically need a
+   .apk file (e.g. for a store listing) — it walks through wrapping this
+   same PWA with PWABuilder once it's deployed at a real URL.
+════════════════════════════════════════ */
+
+// Make the manifest + theme-color discoverable on every page without
+// having to hand-edit <head> in 9 separate HTML files.
+(function injectPwaHeadTags() {
+  if (!document.querySelector('link[rel="manifest"]')) {
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = 'manifest.json';
+    document.head.appendChild(link);
+  }
+  if (!document.querySelector('meta[name="theme-color"]')) {
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    meta.content = '#060a10';
+    document.head.appendChild(meta);
+  }
+  // ── Browser tab favicon (same icon as the app icon) ──────────────────────
+  if (!document.querySelector('link[rel="icon"]')) {
+    const ico = document.createElement('link');
+    ico.rel  = 'icon';
+    ico.type = 'image/png';
+    ico.href = 'assets/icon-192.png';
+    document.head.appendChild(ico);
+  }
+  if (!document.querySelector('link[rel="apple-touch-icon"]')) {
+    const apple = document.createElement('link');
+    apple.rel  = 'apple-touch-icon';
+    apple.href = 'assets/icon-192.png';
+    document.head.appendChild(apple);
+  }
+})();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+// Chrome/Android fires this ~instantly if install criteria are met; we stash
+// it and use it later so the button can trigger the native prompt on tap
+// (browsers require install() to be called from a user gesture).
+window.__deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  window.__deferredInstallPrompt = e;
+});
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+         window.navigator.standalone === true; // iOS Safari
+}
+
+function isIOS() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+async function installApp() {
+  if (isStandalone()) {
+    toast('Future AI Hub is already installed');
+    return;
+  }
+
+  if (window.__deferredInstallPrompt) {
+    window.__deferredInstallPrompt.prompt();
+    const { outcome } = await window.__deferredInstallPrompt.userChoice;
+    window.__deferredInstallPrompt = null;
+    toast(outcome === 'accepted' ? 'Installing…' : 'Install cancelled');
+    return;
+  }
+
+  if (isIOS()) {
+    toast('Tap Share, then "Add to Home Screen"');
+    return;
+  }
+
+  // No native prompt available yet (criteria not met, already dismissed
+  // this session, or an unsupported browser) — this is the same "just tell
+  // them what to do" fallback a store-listing APK button would need anyway.
+  toast('Open this site in Chrome, then use the browser menu → "Install app"');
+}
